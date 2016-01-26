@@ -38,6 +38,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
+import org.kududb.client.ColumnRangePredicate;
 
 // Class containing information for reading a single Kudu tablet
 @JsonTypeName("kudu-tablet-scan")
@@ -117,14 +118,17 @@ public class KuduSubScan extends AbstractBase implements SubScan {
     private final String tableName;
     private final byte[] startKey;
     private final byte[] endKey;
+    private final byte[] predicates;
 
     @JsonCreator
     public KuduSubScanSpec(@JsonProperty("tableName") String tableName,
                            @JsonProperty("startKey") byte[] startKey,
-                           @JsonProperty("endKey") byte[] endKey) {
+                           @JsonProperty("endKey") byte[] endKey,
+                           @JsonProperty("predicates") byte[] predicates) {
       this.tableName = tableName;
       this.startKey = startKey;
       this.endKey = endKey;
+      this.predicates = predicates;
     }
 
     public String getTableName() {
@@ -139,6 +143,9 @@ public class KuduSubScan extends AbstractBase implements SubScan {
       return endKey;
     }
 
+    public byte[] getPredicates() {
+      return predicates;
+    }
   }
 
   @Override

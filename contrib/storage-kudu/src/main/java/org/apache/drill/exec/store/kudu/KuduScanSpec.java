@@ -20,19 +20,39 @@ package org.apache.drill.exec.store.kudu;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.kududb.Schema;
+import org.kududb.client.ColumnRangePredicate;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class KuduScanSpec {
 
   private final String tableName;
+  private final Schema kuduTableSchema;
+  private List<ColumnRangePredicate> predicates = new ArrayList<>();
 
   @JsonCreator
-  public KuduScanSpec(@JsonProperty("tableName") String tableName) {
+  public KuduScanSpec(@JsonProperty("tableName") String tableName, @JsonProperty("tableSchema") Schema kuduTableSchema) {
     this.tableName = tableName;
+    this.kuduTableSchema = kuduTableSchema;
+  }
+
+  public KuduScanSpec(@JsonProperty("tableName") String tableName, @JsonProperty("tableSchema") Schema kuduTableSchema, @JsonProperty("predicates") ColumnRangePredicate pred) {
+    this.tableName = tableName;
+    this.kuduTableSchema = kuduTableSchema;
+    this.predicates.add(pred);
   }
 
   public String getTableName() {
     return tableName;
   }
 
+  public Schema getKuduTableSchema() {
+    return kuduTableSchema;
+  }
 
+  public List<ColumnRangePredicate> getPredicates() {
+    return predicates;
+  }
 }

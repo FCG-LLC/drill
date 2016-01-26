@@ -111,6 +111,10 @@ public class KuduRecordReader extends AbstractRecordReader {
         builder.setProjectedColumnNames(colNames);
       }
 
+      if (scanSpec.getPredicates() != null) {
+        builder.addColumnRangePredicatesRaw(scanSpec.getPredicates());
+      }
+
       context.getStats().startWait();
       try {
         scanner = builder

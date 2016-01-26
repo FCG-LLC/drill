@@ -19,7 +19,6 @@ package org.apache.drill.exec.store.kudu;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -45,12 +44,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import org.apache.drill.exec.store.schedule.AffinityCreator;
 import org.apache.drill.exec.store.schedule.AssignmentCreator;
 import org.apache.drill.exec.store.schedule.CompleteWork;
 import org.apache.drill.exec.store.schedule.EndpointByteMap;
 import org.apache.drill.exec.store.schedule.EndpointByteMapImpl;
+import org.kududb.client.ColumnRangePredicate;
+import org.kududb.client.KuduTable;
 import org.kududb.client.LocatedTablet;
 import org.kududb.client.LocatedTablet.Replica;
 
@@ -95,7 +95,8 @@ public class KuduGroupScan extends AbstractGroupScan {
       endpointMap.put(endpoint.getAddress(), endpoint);
     }
     try {
-      List<LocatedTablet> locations = storagePlugin.getClient().openTable(tableName).getTabletsLocations(10000);
+      KuduTable kuduTable = storagePlugin.getClient().openTable(tableName);
+      List<LocatedTablet> locations = kuduTable.getTabletsLocations(10000);
       for (LocatedTablet tablet : locations) {
         KuduWork work = new KuduWork(tablet.getPartition().getPartitionKeyStart(), tablet.getPartition().getPartitionKeyEnd());
         for (Replica replica : tablet.getReplicas()) {
@@ -117,6 +118,7 @@ public class KuduGroupScan extends AbstractGroupScan {
     private EndpointByteMapImpl byteMap = new EndpointByteMapImpl();
     private byte[] partitionKeyStart;
     private byte[] partitionKeyEnd;
+
 
     public KuduWork(byte[] partitionKeyStart, byte[] partitionKeyEnd) {
       this.partitionKeyStart = partitionKeyStart;
@@ -201,7 +203,7 @@ public class KuduGroupScan extends AbstractGroupScan {
     List<KuduSubScanSpec> scanSpecList = Lists.newArrayList();
 
     for (KuduWork work : workList) {
-      scanSpecList.add(new KuduSubScanSpec(getTableName(), work.getPartitionKeyStart(), work.getPartitionKeyEnd()));
+      scanSpecList.add(new KuduSubScanSpec(getTableName(), work.getPartitionKeyStart(), work.getPartitionKeyEnd(), ColumnRangePredicate.toByteArray(kuduScanSpec.getPredicates())));
     }
 
     return new KuduSubScan(storagePlugin, storagePluginConfig, scanSpecList, this.columns);
@@ -211,8 +213,11 @@ public class KuduGroupScan extends AbstractGroupScan {
   // List<KuduSubScanSpec> tabletInfoList, List<SchemaPath> columns
   @Override
   public ScanStats getScanStats() {
-    long recordCount = 100000 * kuduWorkList.size();
-    return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, recordCount, 1, recordCount);
+    // Very naive - the more constraints the better...
+    int constraintsDenominator = kuduScanSpec.getPredicates().size() + 1;
+    long recordCount = (100000 / constraintsDenominator) * kuduWorkList.size();
+
+    return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, recordCount, 1/((float) constraintsDenominator), recordCount);
   }
 
   @Override

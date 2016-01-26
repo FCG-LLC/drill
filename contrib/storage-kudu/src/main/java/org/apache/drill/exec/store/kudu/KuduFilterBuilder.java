@@ -32,7 +32,6 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 
-import org.apache.drill.exec.store.ischema.Records;
 import org.kududb.ColumnSchema;
 import org.kududb.Type;
 import org.kududb.client.Bytes;

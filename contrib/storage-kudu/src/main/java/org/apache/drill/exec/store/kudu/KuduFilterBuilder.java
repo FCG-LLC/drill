@@ -176,10 +176,10 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
             case "greater_than":
                 if (sortOrderAscending) {
                     // Not that great
-                    setter.setUpperBound(originalValue);
+                    setter.setLowerBound(originalValue);
                 } else {
                     // Not that great
-                    setter.setLowerBound(originalValue);
+                    setter.setUpperBound(originalValue);
                 }
                 break;
             case "less_than_or_equal_to":
@@ -237,10 +237,10 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                     pred.setUpperBound((byte[]) originalValue);
                     break;
                 case INT8:
-                    pred.setUpperBound((byte) originalValue);
+                    pred.setUpperBound(((Integer) originalValue).byteValue());
                     break;
                 case INT16:
-                    pred.setUpperBound((short) originalValue);
+                    pred.setUpperBound(((Integer) originalValue).shortValue());
                     break;
                 case INT32:
                     pred.setUpperBound((int) originalValue);
@@ -272,10 +272,10 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                     pred.setLowerBound((byte[]) originalValue);
                     break;
                 case INT8:
-                    pred.setLowerBound((byte) originalValue);
+                    pred.setLowerBound(((Integer) originalValue).byteValue());
                     break;
                 case INT16:
-                    pred.setLowerBound((short) originalValue);
+                    pred.setLowerBound(((Integer) originalValue).shortValue());
                     break;
                 case INT32:
                     pred.setLowerBound((int) originalValue);

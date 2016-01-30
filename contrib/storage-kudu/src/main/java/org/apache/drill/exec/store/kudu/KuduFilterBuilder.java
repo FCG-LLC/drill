@@ -26,9 +26,9 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.expression.visitors.AbstractExprVisitor;
 
 import java.util.Arrays;
+import java.util.Date;
 
 import org.kududb.ColumnSchema;
-import org.kududb.client.Bytes;
 import org.kududb.client.ColumnRangePredicate;
 
 public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, RuntimeException> {
@@ -149,14 +149,15 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
         String colName = field.getRootSegment().getPath();
         ColumnSchema colSchema = groupScan.getKuduScanSpec().getKuduTableSchema().getColumn(colName);
         ColumnRangePredicate pred = new ColumnRangePredicate(colSchema);
+        ColumnTypeBoundSetter setter = new ColumnTypeBoundSetter(pred);
 
         boolean isNullTest = false;
         byte[] startRow = null;
         byte[] stopRow = null;
         switch (functionName) {
             case "equal":
-                pred.setLowerBound(((int) originalValue));
-                pred.setUpperBound(((int) originalValue));
+                setter.setLowerBound(originalValue);
+                setter.setUpperBound(originalValue);
                 if (isRowKey) {
                     startRow = fieldValue;
                     stopRow = Arrays.copyOf(fieldValue, fieldValue.length+1);
@@ -167,34 +168,34 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                 break;
             case "greater_than_or_equal_to":
                 if (sortOrderAscending) {
-                    pred.setLowerBound((int) originalValue);
+                    setter.setLowerBound(originalValue);
                 } else {
-                    pred.setUpperBound((int) originalValue);
+                    setter.setUpperBound(originalValue);
                 }
                 break;
             case "greater_than":
                 if (sortOrderAscending) {
                     // Not that great
-                    pred.setUpperBound((int) originalValue);
+                    setter.setUpperBound(originalValue);
                 } else {
                     // Not that great
-                    pred.setLowerBound((int) originalValue);
+                    setter.setLowerBound(originalValue);
                 }
                 break;
             case "less_than_or_equal_to":
                 if (sortOrderAscending) {
-                    pred.setUpperBound((int) originalValue);
+                    setter.setUpperBound(originalValue);
                 } else {
-                    pred.setLowerBound((int) originalValue);
+                    setter.setLowerBound(originalValue);
                 }
                 break;
             case "less_than":
                 if (sortOrderAscending) {
                     // Not that great
-                    pred.setUpperBound((int) originalValue);
+                    setter.setUpperBound(originalValue);
                 } else {
                     // Not that great
-                    pred.setLowerBound((int) originalValue);
+                    setter.setLowerBound(originalValue);
                 }
                 break;
             case "isnull":
@@ -217,6 +218,89 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
         }
         // else
         return null;
+    }
+
+    /**
+     * Delegates setting upport and lower bound depending on the actual type
+     */
+    private static class ColumnTypeBoundSetter {
+        private ColumnRangePredicate pred;
+
+        ColumnTypeBoundSetter(ColumnRangePredicate pred) {
+            this.pred = pred;
+        }
+
+
+        void setUpperBound(Object originalValue) {
+            switch(this.pred.getColumn().getType()) {
+                case BINARY:
+                    pred.setUpperBound((byte[]) originalValue);
+                    break;
+                case INT8:
+                    pred.setUpperBound((byte) originalValue);
+                    break;
+                case INT16:
+                    pred.setUpperBound((short) originalValue);
+                    break;
+                case INT32:
+                    pred.setUpperBound((int) originalValue);
+                    break;
+                case INT64:
+                    pred.setUpperBound((long) originalValue);
+                    break;
+                case BOOL:
+                    pred.setUpperBound((boolean) originalValue);
+                    break;
+                case DOUBLE:
+                    pred.setUpperBound((double) originalValue);
+                    break;
+                case FLOAT:
+                    pred.setUpperBound((float) originalValue);
+                    break;
+                case STRING:
+                    pred.setUpperBound((String) originalValue);
+                    break;
+                case TIMESTAMP:
+                    pred.setUpperBound(((Date) originalValue).getTime()*1000L);
+                    break;
+            }
+        }
+
+        void setLowerBound(Object originalValue) {
+            switch(this.pred.getColumn().getType()) {
+                case BINARY:
+                    pred.setLowerBound((byte[]) originalValue);
+                    break;
+                case INT8:
+                    pred.setLowerBound((byte) originalValue);
+                    break;
+                case INT16:
+                    pred.setLowerBound((short) originalValue);
+                    break;
+                case INT32:
+                    pred.setLowerBound((int) originalValue);
+                    break;
+                case INT64:
+                    pred.setLowerBound((long) originalValue);
+                    break;
+                case BOOL:
+                    pred.setLowerBound((boolean) originalValue);
+                    break;
+                case DOUBLE:
+                    pred.setLowerBound((double) originalValue);
+                    break;
+                case FLOAT:
+                    pred.setLowerBound((float) originalValue);
+                    break;
+                case STRING:
+                    pred.setLowerBound((String) originalValue);
+                    break;
+                case TIMESTAMP:
+                    pred.setLowerBound(((Date) originalValue).getTime()*1000L);
+                    break;
+            }
+        }
+
     }
 
 //    private HBaseScanSpec createRowKeyPrefixScanSpec(FunctionCall call,

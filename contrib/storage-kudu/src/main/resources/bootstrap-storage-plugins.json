@@ -2,7 +2,7 @@
   "storage":{
     kudu : {
       type:"kudu",
-      masterAddresses: "1.2.3.4",
+      masterAddresses: "127.0.0.1",
       enabled: false
     }
   }

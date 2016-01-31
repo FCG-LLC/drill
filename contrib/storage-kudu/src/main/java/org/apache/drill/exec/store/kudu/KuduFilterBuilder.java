@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Date;
 
 import org.kududb.ColumnSchema;
+import org.kududb.Type;
 import org.kududb.client.ColumnRangePredicate;
 
 public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, RuntimeException> {
@@ -151,6 +152,11 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
         ColumnRangePredicate pred = new ColumnRangePredicate(colSchema);
         ColumnTypeBoundSetter setter = new ColumnTypeBoundSetter(pred);
 
+        // In case of String only:
+        if (colSchema.getType() == Type.STRING && originalValue == null && fieldValue != null) {
+            originalValue = new String(fieldValue);
+        }
+
         boolean isNullTest = false;
         byte[] startRow = null;
         byte[] stopRow = null;
@@ -206,7 +212,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
             case "isnotnull":
             case "isNotNull":
             case "is not null":
-                // Not supported
+                // Not directly supported - could be done though with max value limits for some types
                 break;
             case "like":
                 // Not supported

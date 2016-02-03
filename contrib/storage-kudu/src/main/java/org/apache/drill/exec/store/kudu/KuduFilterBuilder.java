@@ -87,7 +87,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
         } else {
             switch (functionName) {
                 case "booleanAnd":
-                case "booleanOr":
+                //case "booleanOr":
                     KuduScanSpec firstScanSpec = args.get(0).accept(this, null);
                     for (int i = 1; i < args.size(); ++i) {
                         KuduScanSpec nextScanSpec = args.get(i).accept(this, null);

@@ -18,7 +18,9 @@ package org.apache.drill.exec.store.kudu;
  * limitations under the License.
  */
 
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Multimap;
 import org.apache.drill.common.expression.BooleanOperator;
 import org.apache.drill.common.expression.FunctionCall;
 import org.apache.drill.common.expression.LogicalExpression;
@@ -26,10 +28,14 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.expression.visitors.AbstractExprVisitor;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 
+import org.apache.drill.exec.store.ischema.Records;
 import org.kududb.ColumnSchema;
 import org.kududb.Type;
+import org.kududb.client.Bytes;
 import org.kududb.client.ColumnRangePredicate;
 
 public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, RuntimeException> {
@@ -80,7 +86,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
 
         if (CompareFunctionsProcessor.isCompareFunction(functionName)) {
             CompareFunctionsProcessor processor = CompareFunctionsProcessor.process(call, true);
-            /// FXIEM: WHY skipping CompareFunctionsProcessor ?
+            /// FXIME: WHY skipping CompareFunctionsProcessor ?
             if (processor.isSuccess()) {
                 nodeScanSpec = createKuduScanSpec(call, processor);
             }
@@ -114,8 +120,40 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
 
     private KuduScanSpec mergeScanSpecs(String functionName, KuduScanSpec leftScanSpec, KuduScanSpec rightScanSpec) {
         KuduScanSpec mergedSpec = new KuduScanSpec(leftScanSpec.getTableName(), leftScanSpec.getKuduTableSchema());
-        mergedSpec.getPredicates().addAll(leftScanSpec.getPredicates());
-        mergedSpec.getPredicates().addAll(rightScanSpec.getPredicates());
+
+        Multimap<String, ColumnRangePredicate> colsPredicates = HashMultimap.create();
+
+        for (List<ColumnRangePredicate> predicateList : Arrays.asList(leftScanSpec.getPredicates(), rightScanSpec.getPredicates()))
+            for (ColumnRangePredicate pred : predicateList)
+                colsPredicates.put(pred.getColumn().getName(), pred);
+
+        for (String col : colsPredicates.keySet()) {
+            Collection<ColumnRangePredicate> colPredicates = colsPredicates.get(col);
+
+            if (colPredicates.size() == 1) {
+                mergedSpec.getPredicates().add(colPredicates.iterator().next());
+            } else {
+                ColumnRangePredicate merged = new ColumnRangePredicate(colPredicates.iterator().next().getColumn());
+                ColumnTypeBoundSetter setter = new ColumnTypeBoundSetter(merged);
+
+                Object low = null;
+                Object high = null;
+
+                for (ColumnRangePredicate pred : colPredicates) {
+                    if (pred.getLowerBound() != null) {
+                        low = setter.getSmaller(low, setter.decode(pred.getLowerBound()));
+                    }
+                    if (pred.getUpperBound() != null) {
+                        high = setter.getBigger(high, setter.decode(pred.getUpperBound()));
+                    }
+                }
+
+                setter.setLowerBound(low);
+                setter.setUpperBound(high);
+
+                mergedSpec.getPredicates().add(merged);
+            }
+        }
 
         return mergedSpec;
     }
@@ -229,13 +267,100 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
     /**
      * Delegates setting upport and lower bound depending on the actual type
      */
-    private static class ColumnTypeBoundSetter {
+    public static class ColumnTypeBoundSetter {
         private ColumnRangePredicate pred;
 
         ColumnTypeBoundSetter(ColumnRangePredicate pred) {
             this.pred = pred;
         }
 
+        Object decode(byte[] val) {
+            if (val == null)
+                return null;
+
+            switch(this.pred.getColumn().getType()) {
+                case BINARY:
+                    return val;
+                case INT8:
+                    return Bytes.getByte(val);
+                case INT16:
+                    return Bytes.getShort(val);
+                case INT32:
+                    return Bytes.getInt(val);
+                case INT64:
+                    return Bytes.getLong(val);
+                case BOOL:
+                    return Bytes.getBoolean(val);
+                case DOUBLE:
+                    return Bytes.getDouble(val);
+                case FLOAT:
+                    return Bytes.getFloat(val);
+                case STRING:
+                    return Bytes.getString(val);
+                case TIMESTAMP:
+                    return Bytes.getLong(val);
+            }
+
+            throw new IllegalArgumentException("Type: "+pred.getColumn().getType()+" is not supported");
+        }
+
+        /**
+         * @param v1
+         * @param v2
+         * @param direction
+         * @return Returns the smaller of v1,v2 if direction > 0, larger of v1,v2 if direction < 0
+         */
+        private Object minmax(Object v1, Object v2, int direction) {
+            if (v1 == null) {
+                return v2;
+            } else if (v2 == null) {
+                return v1;
+            } else {
+                switch(this.pred.getColumn().getType()) {
+                    case BINARY:
+                        return new UnsupportedOperationException("Finding min/max for bytearrays is not currently supperted. Sorry!");
+                    case INT8:
+                    case INT16:
+                    case INT32:
+                    case INT64:
+                    case TIMESTAMP:
+                        if (((Long) v1).compareTo((Long) v2)*direction < 0) {
+                            return v1;
+                        } else {
+                            return v2;
+                        }
+                    case BOOL:
+                        if (((Boolean) v1).compareTo((Boolean) v2)*direction < 0) {
+                            return v1;
+                        } else {
+                            return v2;
+                        }
+                    case DOUBLE:
+                    case FLOAT:
+                        if (((Double) v1).compareTo((Double) v2)*direction < 0) {
+                            return v1;
+                        } else {
+                            return v2;
+                        }
+                    case STRING:
+                        if (((String) v1).compareTo((String) v2)*direction < 0) {
+                            return v1;
+                        } else {
+                            return v2;
+                        }
+                }
+
+                throw new IllegalArgumentException("Type: "+pred.getColumn().getType()+" is not supported");
+            }
+        }
+
+        Object getSmaller(Object v1, Object v2) {
+            return minmax(v1, v2, 1);
+        }
+
+        Object getBigger(Object v1, Object v2) {
+            return minmax(v1,v2, -1);
+        }
 
         void setUpperBound(Object originalValue) {
             switch(this.pred.getColumn().getType()) {

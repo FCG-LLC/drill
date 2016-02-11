@@ -55,4 +55,29 @@ public class KuduScanSpec {
   public List<ColumnRangePredicate> getPredicates() {
     return predicates;
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("Predicates on table ");
+    sb.append(tableName);
+    sb.append(" = ");
+    boolean hasPrev = false;
+    for (ColumnRangePredicate pred : predicates) {
+      if (hasPrev) {
+        sb.append(", ");
+      } else {
+        hasPrev = true;
+      }
+
+      KuduFilterBuilder.ColumnTypeBoundSetter setter = new KuduFilterBuilder.ColumnTypeBoundSetter(pred);
+      sb.append(pred.getColumn().getName());
+      sb.append(": ");
+      sb.append(setter.decode(pred.getLowerBound()));
+      sb.append("-");
+      sb.append(setter.decode(pred.getUpperBound()));
+    }
+
+    return sb.toString();
+  }
 }

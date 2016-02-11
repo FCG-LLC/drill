@@ -202,6 +202,10 @@ public class KuduGroupScan extends AbstractGroupScan {
 
     List<KuduSubScanSpec> scanSpecList = Lists.newArrayList();
 
+    logger.info(kuduScanSpec.toString());
+    // FIXME: just for easy debugging purposes
+    System.out.println(kuduScanSpec.toString());
+
     for (KuduWork work : workList) {
       scanSpecList.add(new KuduSubScanSpec(getTableName(), work.getPartitionKeyStart(), work.getPartitionKeyEnd(), ColumnRangePredicate.toByteArray(kuduScanSpec.getPredicates())));
     }

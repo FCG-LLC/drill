@@ -123,9 +123,11 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
 
         Multimap<String, ColumnRangePredicate> colsPredicates = HashMultimap.create();
 
-        for (List<ColumnRangePredicate> predicateList : Arrays.asList(leftScanSpec.getPredicates(), rightScanSpec.getPredicates()))
-            for (ColumnRangePredicate pred : predicateList)
+        for (List<ColumnRangePredicate> predicateList : Arrays.asList(leftScanSpec.getPredicates(), rightScanSpec.getPredicates())) {
+            for (ColumnRangePredicate pred : predicateList) {
                 colsPredicates.put(pred.getColumn().getName(), pred);
+            }
+        }
 
         for (String col : colsPredicates.keySet()) {
             Collection<ColumnRangePredicate> colPredicates = colsPredicates.get(col);
@@ -275,8 +277,9 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
         }
 
         Object decode(byte[] val) {
-            if (val == null)
+            if (val == null) {
                 return null;
+            }
 
             switch(this.pred.getColumn().getType()) {
                 case BINARY:

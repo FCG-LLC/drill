@@ -3,6 +3,7 @@
     kudu : {
       type:"kudu",
       masterAddresses: "127.0.0.1",
+      operationTimeoutMs: 600000,
       enabled: false
     }
   }

@@ -50,7 +50,11 @@ public class KuduStoragePlugin extends AbstractStoragePlugin {
     this.schemaFactory = new KuduSchemaFactory(this, name);
     this.engineConfig = configuration;
     this.name = name;
-    this.client = new KuduClient.KuduClientBuilder(configuration.getMasterAddresses()).build();
+    this.client = new KuduClient.KuduClientBuilder(configuration.getMasterAddresses())
+            .defaultAdminOperationTimeoutMs(configuration.getOperationTimeoutMs())
+            .defaultOperationTimeoutMs(configuration.getOperationTimeoutMs())
+            .defaultSocketReadTimeoutMs(configuration.getOperationTimeoutMs()/2)
+            .build();
   }
 
   @Override

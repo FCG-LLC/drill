@@ -30,46 +30,44 @@ public class KuduStoragePluginConfig extends StoragePluginConfigBase {
   public static final String NAME = "kudu";
 
   private final String masterAddresses;
+  private final long operationTimeoutMs;
 
   @JsonCreator
-  public KuduStoragePluginConfig(@JsonProperty("masterAddresses") String masterAddresses) {
+  public KuduStoragePluginConfig(@JsonProperty("masterAddresses") String masterAddresses, @JsonProperty("operationTimeoutMs") long operationTimoutMs) {
     this.masterAddresses = masterAddresses;
+    this.operationTimeoutMs = operationTimoutMs;
   }
 
   public String getMasterAddresses() {
     return masterAddresses;
   }
 
+  public long getOperationTimeoutMs() { return operationTimeoutMs; }
+
   @Override
   public int hashCode() {
-    final int prime = 31;
-    int result = 1;
-    result = prime * result + ((masterAddresses == null) ? 0 : masterAddresses.hashCode());
+    int result = masterAddresses.hashCode();
+    result = 31 * result + (int) (operationTimeoutMs ^ (operationTimeoutMs >>> 32));
     return result;
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (this == obj) {
+  public boolean equals(Object o) {
+    if (this == o) {
       return true;
     }
-    if (obj == null) {
+
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    if (getClass() != obj.getClass()) {
+
+    KuduStoragePluginConfig that = (KuduStoragePluginConfig) o;
+
+    if (operationTimeoutMs != that.operationTimeoutMs) {
       return false;
     }
-    KuduStoragePluginConfig other = (KuduStoragePluginConfig) obj;
-    if (masterAddresses == null) {
-      if (other.masterAddresses != null) {
-        return false;
-      }
-    } else if (!masterAddresses.equals(other.masterAddresses)) {
-      return false;
-    }
-    return true;
+
+    return masterAddresses != null ? masterAddresses.equals(that.masterAddresses) : that.masterAddresses == null;
   }
-
-
 
 }

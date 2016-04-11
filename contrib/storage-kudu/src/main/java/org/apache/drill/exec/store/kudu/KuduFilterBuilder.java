@@ -86,7 +86,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
 
         if (CompareFunctionsProcessor.isCompareFunction(functionName)) {
             CompareFunctionsProcessor processor = CompareFunctionsProcessor.process(call, true);
-            /// FXIME: WHY skipping CompareFunctionsProcessor ?
+            /// FIXME: WHY skipping CompareFunctionsProcessor ?
             if (processor.isSuccess()) {
                 nodeScanSpec = createKuduScanSpec(call, processor);
             }
@@ -272,11 +272,11 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
     public static class ColumnTypeBoundSetter {
         private ColumnRangePredicate pred;
 
-        ColumnTypeBoundSetter(ColumnRangePredicate pred) {
+        public ColumnTypeBoundSetter(ColumnRangePredicate pred) {
             this.pred = pred;
         }
 
-        Object decode(byte[] val) {
+        public Object decode(byte[] val) {
             if (val == null) {
                 return null;
             }
@@ -323,8 +323,23 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                     case BINARY:
                         return new UnsupportedOperationException("Finding min/max for bytearrays is not currently supperted. Sorry!");
                     case INT8:
+                        if (((Byte) v1).compareTo((Byte) v2)*direction < 0) {
+                            return v1;
+                        } else {
+                            return v2;
+                        }
                     case INT16:
+                        if (((Short) v1).compareTo((Short) v2)*direction < 0) {
+                            return v1;
+                        } else {
+                            return v2;
+                        }
                     case INT32:
+                        if (((Integer) v1).compareTo((Integer) v2)*direction < 0) {
+                            return v1;
+                        } else {
+                            return v2;
+                        }
                     case INT64:
                     case TIMESTAMP:
                         if (((Long) v1).compareTo((Long) v2)*direction < 0) {
@@ -357,15 +372,15 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
             }
         }
 
-        Object getSmaller(Object v1, Object v2) {
+        public Object getSmaller(Object v1, Object v2) {
             return minmax(v1, v2, 1);
         }
 
-        Object getBigger(Object v1, Object v2) {
+        public Object getBigger(Object v1, Object v2) {
             return minmax(v1,v2, -1);
         }
 
-        void setUpperBound(Object originalValue) {
+        public void setUpperBound(Object originalValue) {
             switch(this.pred.getColumn().getType()) {
                 case BINARY:
                     pred.setUpperBound((byte[]) originalValue);
@@ -400,7 +415,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
             }
         }
 
-        void setLowerBound(Object originalValue) {
+        public void setLowerBound(Object originalValue) {
             switch(this.pred.getColumn().getType()) {
                 case BINARY:
                     pred.setLowerBound((byte[]) originalValue);

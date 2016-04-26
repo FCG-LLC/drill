@@ -280,6 +280,11 @@ class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpr
             this.value = ((ValueExpressions.QuotedString) valueArg).value.getBytes(Charsets.UTF_8);
             this.path = path;
             return true;
+        } else if (valueArg instanceof ValueExpressions.LongExpression) {
+            this.value = Bytes.fromLong(((ValueExpressions.LongExpression) valueArg).getLong());
+            this.originalValue = ((ValueExpressions.LongExpression) valueArg).getLong();
+            this.path = path;
+            return true;
         } else if (valueArg instanceof ValueExpressions.IntExpression) {
             this.value = Bytes.fromInt(((ValueExpressions.IntExpression) valueArg).getInt());
             this.originalValue = ((ValueExpressions.IntExpression) valueArg).getInt();

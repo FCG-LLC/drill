@@ -395,7 +395,11 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                     pred.setUpperBound((int) originalValue);
                     break;
                 case INT64:
-                    pred.setUpperBound((long) originalValue);
+                    if (originalValue instanceof Integer) {
+                        pred.setUpperBound(((Integer) originalValue).longValue());
+                    } else {
+                        pred.setUpperBound((long) originalValue);
+                    }
                     break;
                 case BOOL:
                     pred.setUpperBound((boolean) originalValue);
@@ -430,7 +434,11 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                     pred.setLowerBound((int) originalValue);
                     break;
                 case INT64:
-                    pred.setLowerBound((long) originalValue);
+                    if (originalValue instanceof Integer) {
+                        pred.setLowerBound(((Integer) originalValue).longValue());
+                    } else {
+                        pred.setLowerBound((long) originalValue);
+                    }
                     break;
                 case BOOL:
                     pred.setLowerBound((boolean) originalValue);

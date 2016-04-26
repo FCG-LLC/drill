@@ -66,9 +66,10 @@ public class DrillKuduTable extends DynamicDrillTable {
       return typeFactory.createSqlType(SqlTypeName.FLOAT);
     case INT16:
     case INT32:
-    case INT64:
     case INT8:
       return typeFactory.createSqlType(SqlTypeName.INTEGER);
+    case INT64:
+      return typeFactory.createSqlType(SqlTypeName.BIGINT);
     case STRING:
       return typeFactory.createSqlType(SqlTypeName.VARCHAR, Integer.MAX_VALUE);
     case TIMESTAMP:

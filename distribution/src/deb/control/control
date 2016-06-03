@@ -1,5 +1,5 @@
 Package: apache-drill
-Version: 1.7.0-SNAPSHOT
+Version: [[project.version]]-[[buildTimestamp]]
 Section: misc
 Priority: optional
 Architecture: all

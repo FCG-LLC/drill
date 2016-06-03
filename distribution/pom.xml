@@ -349,7 +349,7 @@
                   <goal>jdeb</goal>
                 </goals>
                 <configuration>
-                  <deb>target/apache-drill-${project.version}.deb</deb>
+                  <deb>target/apache-drill-${project.version}-${maven.build.timestamp}.deb</deb>
                   <dataSet>
                     <data>
                       <src>target/apache-drill-${project.version}/apache-drill-${project.version}</src>

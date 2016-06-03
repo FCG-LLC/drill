@@ -46,6 +46,8 @@
     <hadoop.version>2.7.1</hadoop.version>
     <fmpp.version>0.9.15</fmpp.version>
     <freemarker.version>2.3.21</freemarker.version>
+    <maven.build.timestamp.format>yyMMddHHmm</maven.build.timestamp.format>
+    <buildTimestamp>${maven.build.timestamp}</buildTimestamp>
   </properties>
 
   <scm>

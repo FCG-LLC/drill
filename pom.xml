@@ -126,7 +126,7 @@
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
-    </repository>    
+    </repository>
 
     <repository>
       <id>mapr-drill-thirdparty</id>
@@ -576,8 +576,8 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <!-- Mockito needs to be on the class path after JUnit (or Hamcrest) as 
-           long as Mockito _contains_ older Hamcrest classes.  See DRILL-2130. --> 
+      <!-- Mockito needs to be on the class path after JUnit (or Hamcrest) as
+           long as Mockito _contains_ older Hamcrest classes.  See DRILL-2130. -->
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
       <version>1.9.5</version>
@@ -1043,7 +1043,7 @@
               <exclusion>
                 <groupId>io.netty</groupId>
                 <artifactId>netty-all</artifactId>
-              </exclusion>              
+              </exclusion>
               <exclusion>
                 <groupId>javax.servlet</groupId>
                 <artifactId>servlet-api</artifactId>
@@ -1129,8 +1129,12 @@
           <dependency>
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase-client</artifactId>
-            <version>0.98.7-hadoop2</version>
+            <version>1.1.3</version>
             <exclusions>
+              <exclusion>
+                <artifactId>netty-all</artifactId>
+                <groupId>io.netty</groupId>
+              </exclusion>
               <exclusion>
                 <groupId>org.mortbay.jetty</groupId>
                 <artifactId>servlet-api-2.5</artifactId>
@@ -1241,9 +1245,13 @@
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase-testing-util</artifactId>
             <classifier>tests</classifier>
-            <version>0.98.7-hadoop2</version>
+            <version>1.1.3</version>
             <scope>test</scope>
             <exclusions>
+              <exclusion>
+                <groupId>javax.servlet</groupId>
+                <artifactId>servlet-api</artifactId>
+              </exclusion>
               <exclusion>
                 <groupId>org.mortbay.jetty</groupId>
                 <artifactId>servlet-api-2.5</artifactId>
@@ -1392,7 +1400,7 @@
         <alt-hadoop>mapr</alt-hadoop>
         <rat.excludeSubprojects>true</rat.excludeSubprojects>
         <hive.version>1.2.0-mapr-1601</hive.version>
-        <hbase.version>0.98.12-mapr-1602-m7-5.1.0</hbase.version>
+        <hbase.version>1.1.1-mapr-1602-m7-5.1.0</hbase.version>
         <hadoop.version>2.7.0-mapr-1602</hadoop.version>
         <mapr.core.version>5.1.0-mapr</mapr.core.version>
       </properties>
@@ -1498,7 +1506,7 @@
               <exclusion>
                 <groupId>io.netty</groupId>
                 <artifactId>netty-all</artifactId>
-              </exclusion>              
+              </exclusion>
               <exclusion>
                 <artifactId>commons-logging</artifactId>
                 <groupId>commons-logging</groupId>
@@ -1590,6 +1598,10 @@
             <artifactId>mapr-hbase</artifactId>
             <version>${mapr.core.version}</version>
             <exclusions>
+              <exclusion>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-all</artifactId>
+              </exclusion>
               <exclusion>
                 <artifactId>log4j</artifactId>
                 <groupId>log4j</groupId>
@@ -1717,6 +1729,10 @@
             <artifactId>hbase-client</artifactId>
             <version>${hbase.version}</version>
             <exclusions>
+              <exclusion>
+                <artifactId>netty-all</artifactId>
+                <groupId>io.netty</groupId>
+              </exclusion>
               <exclusion>
                 <groupId>javax.servlet</groupId>
                 <artifactId>servlet-api</artifactId>

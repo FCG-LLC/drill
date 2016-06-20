@@ -18,6 +18,8 @@
 package org.apache.drill.exec.store.kudu;
 
 import java.nio.ByteBuffer;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -100,7 +102,7 @@ public class KuduRecordReader extends AbstractRecordReader {
     this.output = output;
     this.context = context;
     try {
-      KuduTable table = client.openTable(scanSpec.getTableName());
+      final KuduTable table = client.openTable(scanSpec.getTableName());
 
       KuduScannerBuilder builder = client.newScannerBuilder(table);
       if (!isStarQuery()) {
@@ -108,6 +110,16 @@ public class KuduRecordReader extends AbstractRecordReader {
         for (SchemaPath p : this.getColumns()) {
           colNames.add(p.getAsUnescapedPath());
         }
+
+        // We must set projected columns in order, otherwise nasty things
+        // related to primary (composite) key columns might happen
+        Collections.sort(colNames, new Comparator<String>() {
+            @Override
+            public int compare(String o1, String o2) {
+                return table.getSchema().getColumnIndex(o1) - table.getSchema().getColumnIndex(o2);
+            }
+        });
+
         builder.setProjectedColumnNames(colNames);
       }
 

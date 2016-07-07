@@ -49,7 +49,8 @@
 @SuppressWarnings("unused")
 
 public class ${aggrtype.className}VarBytesFunctions {
-static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(${aggrtype.className}Functions.class);
+
+static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(${aggrtype.className}VarBytesFunctions.class);
 
 <#list aggrtype.types as type>
 <#if type.major == "VarBytes">
@@ -84,26 +85,21 @@ public void add() {
         int cmp = 0;
         boolean swap = false;
 
-        // if buffer is null then swap
+        // if buffer is null then just put it
         if (init.value == 0) {
         init.value = 1;
-        swap = true;
-        } else {
-        // Concatenate
-        }
-        if (swap) {
-            int inputLength = in.end - in.start;
-            if (tmp.getLength() >= inputLength) {
-            in.buffer.getBytes(in.start, tmp.getBytes(), 0, inputLength);
-            tmp.setLength(inputLength);
+        byte[] tempArray = new byte[in.end - in.start];
+        in.buffer.getBytes(in.start, tempArray, 0, in.end - in.start);
+        tmp.setBytes(tempArray);
         } else {
         byte[] sep = ",".getBytes();
-        byte[] tempArray = new byte[in.end - in.start + tmp.getLength()+1];
-        tmp.getBytes(0, tempArray, 0, tmp.getLength());
+        byte[] tempArray = new byte[in.end - in.start + tmp.getLength()+sep.length];
 
-        in.buffer.getBytes(in.start, tempArray, tmp.getLength()+1, in.end - in.start);
+        System.arraycopy(tmp.getBytes(), 0, tempArray, 0, tmp.getLength());
+        System.arraycopy(sep, 0, tempArray, tmp.getLength(), sep.length);
+        in.buffer.getBytes(in.start, tempArray, tmp.getLength()+sep.length, in.end - in.start);
+
         tmp.setBytes(tempArray);
-        }
         }
 <#if type.inputType?starts_with("Nullable")>
         } // end of sout block
@@ -126,7 +122,6 @@ public void reset() {
         value = new ObjectHolder();
         value.obj = new org.apache.drill.exec.expr.fn.impl.DrillByteArray();
         init.value = 0;
-        nonNullCount.value = 0;
         }
         }
 </#if>

@@ -16,7 +16,7 @@
 
 {
   aggrtypes: [
-    {className: "List", funcName: "list_concat", aliasName: "list", types: [
+    {className: "GroupConcat", funcName: "group_concat", types: [
       {inputType: "VarChar", outputType: "NullableVarChar", runningType: "VarChar", major: "VarBytes"},
       {inputType: "NullableVarChar", outputType: "NullableVarChar", runningType: "VarChar", major: "VarBytes"}
      ]

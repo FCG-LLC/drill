@@ -27,7 +27,7 @@
 // Source code generated using FreeMarker template ${.template_name}
 
 <#-- A utility class that is used to generate java code for aggr functions that concatenate a string -->
-<#-- to hold the result.  This includes: LIST. -->
+<#-- to hold the result.  This includes: GROUP_CONCAT. -->
 
         package org.apache.drill.exec.expr.fn.impl.gaggr;
 

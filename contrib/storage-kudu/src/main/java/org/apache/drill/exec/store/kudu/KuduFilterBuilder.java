@@ -381,6 +381,10 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
         }
 
         public void setUpperBound(Object originalValue) {
+            if (originalValue == null) {
+                return;
+            }
+
             switch(this.pred.getColumn().getType()) {
                 case BINARY:
                     pred.setUpperBound((byte[]) originalValue);
@@ -420,6 +424,10 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
         }
 
         public void setLowerBound(Object originalValue) {
+            if (originalValue == null) {
+                return;
+            }
+
             switch(this.pred.getColumn().getType()) {
                 case BINARY:
                     pred.setLowerBound((byte[]) originalValue);

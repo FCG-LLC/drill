@@ -20,8 +20,9 @@ package org.apache.drill.exec.store.kudu;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.kududb.Schema;
-import org.kududb.client.ColumnRangePredicate;
+import org.apache.kudu.Schema;
+import org.apache.kudu.client.ColumnRangePredicate;
+import org.apache.kudu.client.KuduPredicate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +31,7 @@ public class KuduScanSpec {
 
   private final String tableName;
   private final Schema kuduTableSchema;
-  private List<ColumnRangePredicate> predicates = new ArrayList<>();
+  private List<KuduPredicate> predicates = new ArrayList<>();
 
   @JsonCreator
   public KuduScanSpec(@JsonProperty("tableName") String tableName, @JsonProperty("tableSchema") Schema kuduTableSchema) {
@@ -38,7 +39,7 @@ public class KuduScanSpec {
     this.kuduTableSchema = kuduTableSchema;
   }
 
-  public KuduScanSpec(@JsonProperty("tableName") String tableName, @JsonProperty("tableSchema") Schema kuduTableSchema, @JsonProperty("predicates") ColumnRangePredicate pred) {
+  public KuduScanSpec(@JsonProperty("tableName") String tableName, @JsonProperty("tableSchema") Schema kuduTableSchema, @JsonProperty("predicates") KuduPredicate pred) {
     this.tableName = tableName;
     this.kuduTableSchema = kuduTableSchema;
     this.predicates.add(pred);
@@ -52,7 +53,7 @@ public class KuduScanSpec {
     return kuduTableSchema;
   }
 
-  public List<ColumnRangePredicate> getPredicates() {
+  public List<KuduPredicate> getPredicates() {
     return predicates;
   }
 
@@ -63,19 +64,14 @@ public class KuduScanSpec {
     sb.append(tableName);
     sb.append(" = ");
     boolean hasPrev = false;
-    for (ColumnRangePredicate pred : predicates) {
+    for (KuduPredicate pred : predicates) {
       if (hasPrev) {
         sb.append(", ");
       } else {
         hasPrev = true;
       }
 
-      KuduFilterBuilder.ColumnTypeBoundSetter setter = new KuduFilterBuilder.ColumnTypeBoundSetter(pred);
-      sb.append(pred.getColumn().getName());
-      sb.append(": ");
-      sb.append(setter.decode(pred.getLowerBound()));
-      sb.append("-");
-      sb.append(setter.decode(pred.getUpperBound()));
+      sb.append(pred.toString());
     }
 
     return sb.toString();

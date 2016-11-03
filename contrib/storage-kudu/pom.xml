@@ -47,9 +47,9 @@
     </dependency>
 
     <dependency>
-      <groupId>org.kududb</groupId>
+      <groupId>org.apache.kudu</groupId>
       <artifactId>kudu-client</artifactId>
-      <version>0.6.0</version>
+      <version>1.0.1</version>
     </dependency>
 
   </dependencies>

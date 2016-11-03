@@ -23,9 +23,9 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.exec.planner.logical.DynamicDrillTable;
-import org.kududb.ColumnSchema;
-import org.kududb.Schema;
-import org.kududb.Type;
+import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.Schema;
+import org.apache.kudu.Type;
 
 import com.google.common.collect.Lists;
 
@@ -72,7 +72,7 @@ public class DrillKuduTable extends DynamicDrillTable {
       return typeFactory.createSqlType(SqlTypeName.BIGINT);
     case STRING:
       return typeFactory.createSqlType(SqlTypeName.VARCHAR, Integer.MAX_VALUE);
-    case TIMESTAMP:
+    case UNIXTIME_MICROS:
       return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
     default:
       throw new UnsupportedOperationException("Unsupported type.");

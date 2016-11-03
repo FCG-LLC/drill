@@ -49,10 +49,11 @@ import org.apache.drill.exec.store.schedule.AssignmentCreator;
 import org.apache.drill.exec.store.schedule.CompleteWork;
 import org.apache.drill.exec.store.schedule.EndpointByteMap;
 import org.apache.drill.exec.store.schedule.EndpointByteMapImpl;
-import org.kududb.client.ColumnRangePredicate;
-import org.kududb.client.KuduTable;
-import org.kududb.client.LocatedTablet;
-import org.kududb.client.LocatedTablet.Replica;
+import org.apache.kudu.client.ColumnRangePredicate;
+import org.apache.kudu.client.KuduPredicate;
+import org.apache.kudu.client.KuduTable;
+import org.apache.kudu.client.LocatedTablet;
+import org.apache.kudu.client.LocatedTablet.Replica;
 
 @JsonTypeName("kudu-scan")
 public class KuduGroupScan extends AbstractGroupScan {
@@ -207,6 +208,11 @@ public class KuduGroupScan extends AbstractGroupScan {
     System.out.println(kuduScanSpec.toString());
 
     for (KuduWork work : workList) {
+      for (KuduPredicate pred : kuduScanSpec.getPredicates()) {
+        pred.toPB().toByteArray();
+        KuduPredicate.
+
+      };
       scanSpecList.add(new KuduSubScanSpec(getTableName(), work.getPartitionKeyStart(), work.getPartitionKeyEnd(), ColumnRangePredicate.toByteArray(kuduScanSpec.getPredicates())));
     }
 

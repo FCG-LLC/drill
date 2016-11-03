@@ -29,15 +29,11 @@ import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.record.BatchSchema;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.VectorAccessible;
-import org.kududb.ColumnSchema;
-import org.kududb.Schema;
-import org.kududb.Type;
-import org.kududb.client.Insert;
-import org.kududb.client.KuduClient;
-import org.kududb.client.KuduSession;
-import org.kududb.client.KuduTable;
-import org.kududb.client.OperationResponse;
-import org.kududb.client.SessionConfiguration.FlushMode;
+import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.Schema;
+import org.apache.kudu.Type;
+import org.apache.kudu.client.*;
+import org.apache.kudu.client.SessionConfiguration.FlushMode;
 
 public class KuduRecordWriterImpl extends KuduRecordWriter {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(KuduRecordWriterImpl.class);
@@ -81,7 +77,9 @@ public class KuduRecordWriterImpl extends KuduRecordWriter {
           i++;
         }
         Schema kuduSchema = new Schema(columns);
-        table = client.createTable(name, kuduSchema);
+
+        CreateTableOptions options = new CreateTableOptions();
+        table = client.createTable(name, kuduSchema, options);
       }
     } catch (Exception e) {
       throw new IOException(e);
@@ -113,7 +111,7 @@ public class KuduRecordWriterImpl extends KuduRecordWriter {
     case INT:
       return Type.INT32;
     case TIMESTAMP:
-      return Type.TIMESTAMP;
+      return Type.UNIXTIME_MICROS;
     case VARBINARY:
       return Type.BINARY;
     case VARCHAR:

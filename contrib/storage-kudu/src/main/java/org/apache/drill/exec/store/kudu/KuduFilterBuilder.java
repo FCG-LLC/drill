@@ -32,10 +32,11 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 
-import org.kududb.ColumnSchema;
-import org.kududb.Type;
-import org.kududb.client.Bytes;
-import org.kududb.client.ColumnRangePredicate;
+import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.Type;
+import org.apache.kudu.client.Bytes;
+import org.apache.kudu.client.ColumnRangePredicate;
+import org.apache.kudu.client.KuduPredicate;
 
 public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, RuntimeException> {
 
@@ -120,39 +121,10 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
     private KuduScanSpec mergeScanSpecs(String functionName, KuduScanSpec leftScanSpec, KuduScanSpec rightScanSpec) {
         KuduScanSpec mergedSpec = new KuduScanSpec(leftScanSpec.getTableName(), leftScanSpec.getKuduTableSchema());
 
-        Multimap<String, ColumnRangePredicate> colsPredicates = HashMultimap.create();
-
-        for (List<ColumnRangePredicate> predicateList : Arrays.asList(leftScanSpec.getPredicates(), rightScanSpec.getPredicates())) {
-            for (ColumnRangePredicate pred : predicateList) {
-                colsPredicates.put(pred.getColumn().getName(), pred);
-            }
-        }
-
-        for (String col : colsPredicates.keySet()) {
-            Collection<ColumnRangePredicate> colPredicates = colsPredicates.get(col);
-
-            if (colPredicates.size() == 1) {
-                mergedSpec.getPredicates().add(colPredicates.iterator().next());
-            } else {
-                ColumnRangePredicate merged = new ColumnRangePredicate(colPredicates.iterator().next().getColumn());
-                ColumnTypeBoundSetter setter = new ColumnTypeBoundSetter(merged);
-
-                Object low = null;
-                Object high = null;
-
-                for (ColumnRangePredicate pred : colPredicates) {
-                    if (pred.getLowerBound() != null) {
-                        low = setter.getSmaller(low, setter.decode(pred.getLowerBound()));
-                    }
-                    if (pred.getUpperBound() != null) {
-                        high = setter.getBigger(high, setter.decode(pred.getUpperBound()));
-                    }
-                }
-
-                setter.setLowerBound(low);
-                setter.setUpperBound(high);
-
-                mergedSpec.getPredicates().add(merged);
+        for (List<KuduPredicate> predicateList : Arrays.asList(leftScanSpec.getPredicates(), rightScanSpec.getPredicates())) {
+            for (KuduPredicate pred : predicateList) {
+                // Kudu API will handle merging predicates
+                mergedSpec.getPredicates().add(pred);
             }
         }
 
@@ -188,8 +160,6 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
 
         String colName = field.getRootSegment().getPath();
         ColumnSchema colSchema = groupScan.getKuduScanSpec().getKuduTableSchema().getColumn(colName);
-        ColumnRangePredicate pred = new ColumnRangePredicate(colSchema);
-        ColumnTypeBoundSetter setter = new ColumnTypeBoundSetter(pred);
 
         // In case of String only:
         if (colSchema.getType() == Type.STRING && originalValue == null && fieldValue != null) {
@@ -199,10 +169,11 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
         boolean isNullTest = false;
         byte[] startRow = null;
         byte[] stopRow = null;
+
+        KuduPredicate.ComparisonOp op = null;
         switch (functionName) {
             case "equal":
-                setter.setLowerBound(originalValue);
-                setter.setUpperBound(originalValue);
+                op = KuduPredicate.ComparisonOp.EQUAL;
                 if (isRowKey) {
                     startRow = fieldValue;
                     stopRow = Arrays.copyOf(fieldValue, fieldValue.length+1);
@@ -213,40 +184,39 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                 break;
             case "greater_than_or_equal_to":
                 if (sortOrderAscending) {
-                    setter.setLowerBound(originalValue);
+                    op = KuduPredicate.ComparisonOp.GREATER_EQUAL;
                 } else {
-                    setter.setUpperBound(originalValue);
+                    op = KuduPredicate.ComparisonOp.LESS_EQUAL;
                 }
                 break;
             case "greater_than":
                 if (sortOrderAscending) {
-                    // Not that great
-                    setter.setLowerBound(originalValue);
+                    op = KuduPredicate.ComparisonOp.GREATER;
                 } else {
-                    // Not that great
-                    setter.setUpperBound(originalValue);
+                    op = KuduPredicate.ComparisonOp.LESS;
                 }
                 break;
             case "less_than_or_equal_to":
                 if (sortOrderAscending) {
-                    setter.setUpperBound(originalValue);
+                    op = KuduPredicate.ComparisonOp.LESS_EQUAL;
                 } else {
-                    setter.setLowerBound(originalValue);
+                    op = KuduPredicate.ComparisonOp.GREATER_EQUAL;
                 }
                 break;
             case "less_than":
                 if (sortOrderAscending) {
                     // Not that great
-                    setter.setUpperBound(originalValue);
+                    op = KuduPredicate.ComparisonOp.LESS;
                 } else {
                     // Not that great
-                    setter.setLowerBound(originalValue);
+                    op = KuduPredicate.ComparisonOp.GREATER;
                 }
                 break;
             case "isnull":
             case "isNull":
             case "is null":
                 // Not supported
+                // op = KuduPredicate.ComparisonOp.EQUAL;
                 break;
             case "isnotnull":
             case "isNotNull":
@@ -254,215 +224,67 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                 // Not directly supported - could be done though with max value limits for some types
                 break;
             case "like":
-                // Not supported
+                // Not supported - could be supporting prefix search
                 break;
+
+
+
         }
 
-        if (pred.getLowerBound() != null || pred.getUpperBound() != null) {
-            return new KuduScanSpec(groupScan.getTableName(), groupScan.getKuduScanSpec().getKuduTableSchema(), pred);
+        KuduPredicate predicate = new KuduPredicateFactory(colSchema, op).create(originalValue);;
+
+        if (predicate != null) {
+            return new KuduScanSpec(groupScan.getTableName(), groupScan.getKuduScanSpec().getKuduTableSchema(), predicate);
         }
-        // else
+
         return null;
     }
 
     /**
      * Delegates setting upport and lower bound depending on the actual type
      */
-    public static class ColumnTypeBoundSetter {
-        private ColumnRangePredicate pred;
+    public static class KuduPredicateFactory {
+        private ColumnSchema columnSchema;
+        private KuduPredicate.ComparisonOp comparisonOp;
 
-        public ColumnTypeBoundSetter(ColumnRangePredicate pred) {
-            this.pred = pred;
+        public KuduPredicateFactory(ColumnSchema columnSchema, KuduPredicate.ComparisonOp comparisonOp) {
+            this.columnSchema = columnSchema;
+            this.comparisonOp = comparisonOp;
         }
 
-        public Object decode(byte[] val) {
-            if (val == null) {
+        public KuduPredicate create(Object originalValue) {
+            if (originalValue == null || comparisonOp == null) {
                 return null;
             }
 
-            switch(this.pred.getColumn().getType()) {
+            switch(this.columnSchema.getType()) {
                 case BINARY:
-                    return val;
+                    return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, (byte[]) originalValue);
                 case INT8:
-                    return Bytes.getByte(val);
+                    return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, ((Integer) originalValue).byteValue());
                 case INT16:
-                    return Bytes.getShort(val);
+                    return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, ((Integer) originalValue).shortValue());
                 case INT32:
-                    return Bytes.getInt(val);
-                case INT64:
-                    return Bytes.getLong(val);
-                case BOOL:
-                    return Bytes.getBoolean(val);
-                case DOUBLE:
-                    return Bytes.getDouble(val);
-                case FLOAT:
-                    return Bytes.getFloat(val);
-                case STRING:
-                    return Bytes.getString(val);
-                case TIMESTAMP:
-                    return Bytes.getLong(val);
-            }
-
-            throw new IllegalArgumentException("Type: "+pred.getColumn().getType()+" is not supported");
-        }
-
-        /**
-         * @param v1
-         * @param v2
-         * @param direction
-         * @return Returns the smaller of v1,v2 if direction > 0, larger of v1,v2 if direction < 0
-         */
-        private Object minmax(Object v1, Object v2, int direction) {
-            if (v1 == null) {
-                return v2;
-            } else if (v2 == null) {
-                return v1;
-            } else {
-                switch(this.pred.getColumn().getType()) {
-                    case BINARY:
-                        return new UnsupportedOperationException("Finding min/max for bytearrays is not currently supperted. Sorry!");
-                    case INT8:
-                        if (((Byte) v1).compareTo((Byte) v2)*direction < 0) {
-                            return v1;
-                        } else {
-                            return v2;
-                        }
-                    case INT16:
-                        if (((Short) v1).compareTo((Short) v2)*direction < 0) {
-                            return v1;
-                        } else {
-                            return v2;
-                        }
-                    case INT32:
-                        if (((Integer) v1).compareTo((Integer) v2)*direction < 0) {
-                            return v1;
-                        } else {
-                            return v2;
-                        }
-                    case INT64:
-                    case TIMESTAMP:
-                        if (((Long) v1).compareTo((Long) v2)*direction < 0) {
-                            return v1;
-                        } else {
-                            return v2;
-                        }
-                    case BOOL:
-                        if (((Boolean) v1).compareTo((Boolean) v2)*direction < 0) {
-                            return v1;
-                        } else {
-                            return v2;
-                        }
-                    case DOUBLE:
-                    case FLOAT:
-                        if (((Double) v1).compareTo((Double) v2)*direction < 0) {
-                            return v1;
-                        } else {
-                            return v2;
-                        }
-                    case STRING:
-                        if (((String) v1).compareTo((String) v2)*direction < 0) {
-                            return v1;
-                        } else {
-                            return v2;
-                        }
-                }
-
-                throw new IllegalArgumentException("Type: "+pred.getColumn().getType()+" is not supported");
-            }
-        }
-
-        public Object getSmaller(Object v1, Object v2) {
-            return minmax(v1, v2, 1);
-        }
-
-        public Object getBigger(Object v1, Object v2) {
-            return minmax(v1,v2, -1);
-        }
-
-        public void setUpperBound(Object originalValue) {
-            if (originalValue == null) {
-                return;
-            }
-
-            switch(this.pred.getColumn().getType()) {
-                case BINARY:
-                    pred.setUpperBound((byte[]) originalValue);
-                    break;
-                case INT8:
-                    pred.setUpperBound(((Integer) originalValue).byteValue());
-                    break;
-                case INT16:
-                    pred.setUpperBound(((Integer) originalValue).shortValue());
-                    break;
-                case INT32:
-                    pred.setUpperBound((int) originalValue);
-                    break;
+                    return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, (int) originalValue);
                 case INT64:
                     if (originalValue instanceof Integer) {
-                        pred.setUpperBound(((Integer) originalValue).longValue());
+                        return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, ((Integer) originalValue).longValue());
                     } else {
-                        pred.setUpperBound((long) originalValue);
+                        return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, (long) originalValue);
                     }
-                    break;
                 case BOOL:
-                    pred.setUpperBound((boolean) originalValue);
-                    break;
+                    return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, (boolean) originalValue);
                 case DOUBLE:
-                    pred.setUpperBound((double) originalValue);
-                    break;
+                    return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, (double) originalValue);
                 case FLOAT:
-                    pred.setUpperBound((float) originalValue);
-                    break;
+                    return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, (float) originalValue);
                 case STRING:
-                    pred.setUpperBound((String) originalValue);
-                    break;
-                case TIMESTAMP:
-                    pred.setUpperBound(((Date) originalValue).getTime()*1000L);
-                    break;
-            }
-        }
-
-        public void setLowerBound(Object originalValue) {
-            if (originalValue == null) {
-                return;
+                    return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, (String) originalValue);
+                case UNIXTIME_MICROS:
+                    return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, ((Date) originalValue).getTime()*1000L);
             }
 
-            switch(this.pred.getColumn().getType()) {
-                case BINARY:
-                    pred.setLowerBound((byte[]) originalValue);
-                    break;
-                case INT8:
-                    pred.setLowerBound(((Integer) originalValue).byteValue());
-                    break;
-                case INT16:
-                    pred.setLowerBound(((Integer) originalValue).shortValue());
-                    break;
-                case INT32:
-                    pred.setLowerBound((int) originalValue);
-                    break;
-                case INT64:
-                    if (originalValue instanceof Integer) {
-                        pred.setLowerBound(((Integer) originalValue).longValue());
-                    } else {
-                        pred.setLowerBound((long) originalValue);
-                    }
-                    break;
-                case BOOL:
-                    pred.setLowerBound((boolean) originalValue);
-                    break;
-                case DOUBLE:
-                    pred.setLowerBound((double) originalValue);
-                    break;
-                case FLOAT:
-                    pred.setLowerBound((float) originalValue);
-                    break;
-                case STRING:
-                    pred.setLowerBound((String) originalValue);
-                    break;
-                case TIMESTAMP:
-                    pred.setLowerBound(((Date) originalValue).getTime()*1000L);
-                    break;
-            }
+            return null;
         }
 
     }

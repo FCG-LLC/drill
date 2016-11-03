@@ -38,7 +38,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
-import org.kududb.client.ColumnRangePredicate;
+import org.apache.kudu.client.ColumnRangePredicate;
 
 // Class containing information for reading a single Kudu tablet
 @JsonTypeName("kudu-tablet-scan")

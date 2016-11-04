@@ -88,7 +88,7 @@ import java.lang.UnsupportedOperationException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.kududb.client.*;
+import org.apache.kudu.client.*;
 import org.apache.drill.exec.store.*;
 
 public abstract class KuduRecordWriter extends AbstractRecordWriter implements RecordWriter {

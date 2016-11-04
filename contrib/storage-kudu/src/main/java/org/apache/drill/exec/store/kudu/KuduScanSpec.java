@@ -25,6 +25,7 @@ import org.apache.kudu.client.ColumnRangePredicate;
 import org.apache.kudu.client.KuduPredicate;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 public class KuduScanSpec {
@@ -43,6 +44,12 @@ public class KuduScanSpec {
     this.tableName = tableName;
     this.kuduTableSchema = kuduTableSchema;
     this.predicates.add(pred);
+  }
+
+  public KuduScanSpec(@JsonProperty("tableName") String tableName, @JsonProperty("tableSchema") Schema kuduTableSchema, @JsonProperty("predicates") Collection<KuduPredicate> preds) {
+    this.tableName = tableName;
+    this.kuduTableSchema = kuduTableSchema;
+    this.predicates.addAll(preds);
   }
 
   public String getTableName() {

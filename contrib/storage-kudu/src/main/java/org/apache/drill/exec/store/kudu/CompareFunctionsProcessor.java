@@ -31,7 +31,7 @@ import org.apache.drill.common.expression.CastExpression;
 import org.apache.drill.common.expression.ConvertExpression;
 import org.apache.drill.common.expression.visitors.AbstractExprVisitor;
 import org.apache.htrace.fasterxml.jackson.annotation.JsonFormat;
-import org.kududb.client.Bytes;
+import org.apache.kudu.client.Bytes;
 
 import java.nio.ByteOrder;
 

@@ -17,7 +17,8 @@
  */
 package org.apache.drill.exec.store.kudu;
 
-import java.io.IOException;
+import java.io.*;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +50,8 @@ import org.apache.drill.exec.store.schedule.AssignmentCreator;
 import org.apache.drill.exec.store.schedule.CompleteWork;
 import org.apache.drill.exec.store.schedule.EndpointByteMap;
 import org.apache.drill.exec.store.schedule.EndpointByteMapImpl;
-import org.apache.kudu.client.ColumnRangePredicate;
+import org.apache.kudu.Common;
+import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduPredicate;
 import org.apache.kudu.client.KuduTable;
 import org.apache.kudu.client.LocatedTablet;
@@ -196,6 +198,43 @@ public class KuduGroupScan extends AbstractGroupScan {
     assignments = AssignmentCreator.getMappings(incomingEndpoints, kuduWorkList);
   }
 
+  public static byte[] serializePredicates(List<KuduPredicate> predicates) throws IOException {
+    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    ObjectOutputStream os = new ObjectOutputStream(bos);
+
+    os.writeInt(predicates.size());
+
+    for (KuduPredicate pred : predicates) {
+      byte[] arr = pred.toPB().toByteArray();
+      os.writeInt(arr.length);
+      os.write(arr);
+    }
+
+    os.close();
+    return bos.toByteArray();
+  }
+
+  public static List<KuduPredicate> deserializePredicates(Schema tableSchema, byte[] serializedPredicates) throws IOException {
+    ByteArrayInputStream bis = new ByteArrayInputStream(serializedPredicates);
+    ObjectInputStream ois = new ObjectInputStream(bis);
+
+    int predicatesCount = ois.readInt();
+    List<KuduPredicate> predicates = new ArrayList<>();
+
+    for (int i = 0; i < predicatesCount; i++) {
+      int len = ois.readInt();
+      byte[] arr = new byte[len];
+      ois.readFully(arr, 0, len);
+
+      Common.ColumnPredicatePB colPredicate = Common.ColumnPredicatePB.parseFrom(arr);
+      predicates.add(KuduPredicate.fromPB(tableSchema, colPredicate));
+    }
+
+    ois.close();
+
+    return predicates;
+  }
+
 
   @Override
   public KuduSubScan getSpecificScan(int minorFragmentId) {
@@ -207,13 +246,12 @@ public class KuduGroupScan extends AbstractGroupScan {
     // FIXME: just for easy debugging purposes
     System.out.println(kuduScanSpec.toString());
 
-    for (KuduWork work : workList) {
-      for (KuduPredicate pred : kuduScanSpec.getPredicates()) {
-        pred.toPB().toByteArray();
-        KuduPredicate.
-
-      };
-      scanSpecList.add(new KuduSubScanSpec(getTableName(), work.getPartitionKeyStart(), work.getPartitionKeyEnd(), ColumnRangePredicate.toByteArray(kuduScanSpec.getPredicates())));
+    try {
+      for (KuduWork work : workList) {
+        scanSpecList.add(new KuduSubScanSpec(getTableName(), work.getPartitionKeyStart(), work.getPartitionKeyEnd(), serializePredicates(kuduScanSpec.getPredicates())));
+      }
+    } catch (IOException ioe) {
+      throw new RuntimeException(ioe);
     }
 
     return new KuduSubScan(storagePlugin, storagePluginConfig, scanSpecList, this.columns);

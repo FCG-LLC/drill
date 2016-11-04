@@ -57,12 +57,8 @@ import org.apache.drill.exec.vector.VarCharVector;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.Type;
-import org.apache.kudu.client.KuduClient;
-import org.apache.kudu.client.KuduScanner;
+import org.apache.kudu.client.*;
 import org.apache.kudu.client.KuduScanner.KuduScannerBuilder;
-import org.apache.kudu.client.KuduTable;
-import org.apache.kudu.client.RowResult;
-import org.apache.kudu.client.RowResultIterator;
 import org.apache.kudu.client.shaded.com.google.common.collect.ImmutableMap;
 
 import com.google.common.collect.ImmutableList;
@@ -103,6 +99,7 @@ public class KuduRecordReader extends AbstractRecordReader {
     this.context = context;
     try {
       final KuduTable table = client.openTable(scanSpec.getTableName());
+      final Schema tableSchema = table.getSchema();
 
       KuduScannerBuilder builder = client.newScannerBuilder(table);
       if (!isStarQuery()) {
@@ -124,8 +121,10 @@ public class KuduRecordReader extends AbstractRecordReader {
       }
 
       if (scanSpec.getPredicates() != null) {
-        builder.addPredicate()
-        builder.addColumnRangePredicatesRaw(scanSpec.getPredicates());
+        List<KuduPredicate> predicates = KuduGroupScan.deserializePredicates(tableSchema, scanSpec.getPredicates());
+        for (KuduPredicate pred : predicates) {
+          builder.addPredicate(pred);
+        }
       }
 
       context.getStats().startWait();

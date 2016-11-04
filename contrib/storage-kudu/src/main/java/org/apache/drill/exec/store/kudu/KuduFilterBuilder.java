@@ -224,6 +224,28 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                 // Not directly supported - could be done though with max value limits for some types
                 break;
             case "like":
+                String likeConstraint = (String) originalValue;
+                if (!likeConstraint.startsWith("%")) {
+                    // Prefix search supported only
+
+                    if (likeConstraint.indexOf('%') == -1) {
+                        // This is equals query
+                        op = KuduPredicate.ComparisonOp.EQUAL;
+                    } else {
+                        String strMin = likeConstraint.split("%")[0];
+                        String strMax = strMin.substring(0, strMin.length()-1);
+                        strMax = strMax + strMin.charAt(strMin.length()-1)+1; // FIXME: how this works? 255 character anyone?
+
+                        KuduPredicate minPredicate = KuduPredicate.newComparisonPredicate(colSchema, KuduPredicate.ComparisonOp.GREATER_EQUAL, strMin);
+                        KuduPredicate maxPredicate = KuduPredicate.newComparisonPredicate(colSchema, KuduPredicate.ComparisonOp.LESS, strMax);
+
+                        return new KuduScanSpec(
+                                groupScan.getTableName(),
+                                groupScan.getKuduScanSpec().getKuduTableSchema(),
+                                Arrays.asList(minPredicate, maxPredicate)
+                        );
+                    }
+                }
                 // Not supported - could be supporting prefix search
                 break;
 
@@ -231,7 +253,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
 
         }
 
-        KuduPredicate predicate = new KuduPredicateFactory(colSchema, op).create(originalValue);;
+        KuduPredicate predicate = new KuduPredicateFactory(colSchema, op).create(originalValue);
 
         if (predicate != null) {
             return new KuduScanSpec(groupScan.getTableName(), groupScan.getKuduScanSpec().getKuduTableSchema(), predicate);

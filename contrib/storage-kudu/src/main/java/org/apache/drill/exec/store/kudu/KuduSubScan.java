@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.store.kudu;
 
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -39,6 +40,9 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
 import org.apache.kudu.client.ColumnRangePredicate;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduScanToken;
+import org.apache.kudu.client.KuduScanner;
 
 // Class containing information for reading a single Kudu tablet
 @JsonTypeName("kudu-tablet-scan")
@@ -116,35 +120,25 @@ public class KuduSubScan extends AbstractBase implements SubScan {
   public static class KuduSubScanSpec {
 
     private final String tableName;
-    private final byte[] startKey;
-    private final byte[] endKey;
-    private final byte[] predicates;
+    private final byte[] serializedScanToken;
 
     @JsonCreator
     public KuduSubScanSpec(@JsonProperty("tableName") String tableName,
-                           @JsonProperty("startKey") byte[] startKey,
-                           @JsonProperty("endKey") byte[] endKey,
-                           @JsonProperty("predicates") byte[] predicates) {
+                           @JsonProperty("startKey") byte[] serializedScanToken) {
       this.tableName = tableName;
-      this.startKey = startKey;
-      this.endKey = endKey;
-      this.predicates = predicates;
+      this.serializedScanToken = serializedScanToken;
     }
 
     public String getTableName() {
       return tableName;
     }
 
-    public byte[] getStartKey() {
-      return startKey;
+    public byte[] getSerializedScanToken() {
+      return serializedScanToken;
     }
 
-    public byte[] getEndKey() {
-      return endKey;
-    }
-
-    public byte[] getPredicates() {
-      return predicates;
+    public KuduScanner deserializeIntoScanner(KuduClient client) throws IOException {
+      return KuduScanToken.deserializeIntoScanner(serializedScanToken, client);
     }
   }
 

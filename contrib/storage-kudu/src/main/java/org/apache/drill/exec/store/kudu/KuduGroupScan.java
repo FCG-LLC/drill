@@ -18,11 +18,10 @@
 package org.apache.drill.exec.store.kudu;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
+import com.google.common.base.Predicate;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -35,6 +34,7 @@ import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
+import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.kudu.KuduSubScan.KuduSubScanSpec;
 
@@ -52,10 +52,10 @@ import org.apache.drill.exec.store.schedule.EndpointByteMap;
 import org.apache.drill.exec.store.schedule.EndpointByteMapImpl;
 import org.apache.kudu.Common;
 import org.apache.kudu.Schema;
-import org.apache.kudu.client.KuduPredicate;
-import org.apache.kudu.client.KuduTable;
-import org.apache.kudu.client.LocatedTablet;
+import org.apache.kudu.client.*;
 import org.apache.kudu.client.LocatedTablet.Replica;
+
+import static org.apache.drill.exec.store.AbstractRecordReader.STAR_COLUMN;
 
 @JsonTypeName("kudu-scan")
 public class KuduGroupScan extends AbstractGroupScan {
@@ -90,19 +90,55 @@ public class KuduGroupScan extends AbstractGroupScan {
     init();
   }
 
+  private List<KuduScanToken> initScanTokens() throws KuduException {
+    final KuduClient client = storagePlugin.getClient();
+    final KuduTable table = client.openTable(kuduScanSpec.getTableName());
+    final Schema tableSchema = table.getSchema();
+
+    KuduScanToken.KuduScanTokenBuilder scanTokenBuilder = client.newScanTokenBuilder(table);
+
+    if (!AbstractRecordReader.isStarQuery(columns)) {
+      List<String> colNames = Lists.newArrayList();
+      for (SchemaPath p : this.getColumns()) {
+        colNames.add(p.getAsUnescapedPath());
+      }
+
+      // We must set projected columns in order, otherwise nasty things
+      // related to primary (composite) key columns might happen
+      Collections.sort(colNames, new Comparator<String>() {
+        @Override
+        public int compare(String o1, String o2) {
+          return table.getSchema().getColumnIndex(o1) - table.getSchema().getColumnIndex(o2);
+        }
+      });
+
+      scanTokenBuilder.setProjectedColumnNames(colNames);
+    }
+
+    if (kuduScanSpec.getPredicates() != null) {
+      for (KuduPredicate pred : kuduScanSpec.getPredicates()) {
+        scanTokenBuilder.addPredicate(pred);
+      }
+    }
+
+    return scanTokenBuilder.build();
+  }
+
   private void init() {
-    String tableName = kuduScanSpec.getTableName();
     Collection<DrillbitEndpoint> endpoints = storagePlugin.getContext().getBits();
     Map<String,DrillbitEndpoint> endpointMap = Maps.newHashMap();
     for (DrillbitEndpoint endpoint : endpoints) {
       endpointMap.put(endpoint.getAddress(), endpoint);
     }
+
     try {
-      KuduTable kuduTable = storagePlugin.getClient().openTable(tableName);
-      List<LocatedTablet> locations = kuduTable.getTabletsLocations(10000);
-      for (LocatedTablet tablet : locations) {
-        KuduWork work = new KuduWork(tablet.getPartition().getPartitionKeyStart(), tablet.getPartition().getPartitionKeyEnd());
-        for (Replica replica : tablet.getReplicas()) {
+
+      final List<KuduScanToken> scanTokens = initScanTokens();
+
+      for (KuduScanToken scanToken : scanTokens) {
+        KuduWork work = new KuduWork(scanToken.serialize());
+
+        for (Replica replica : scanToken.getTablet().getReplicas()) {
           String host = replica.getRpcHost();
           DrillbitEndpoint ep = endpointMap.get(host);
           if (ep != null) {
@@ -110,6 +146,7 @@ public class KuduGroupScan extends AbstractGroupScan {
           }
         }
         kuduWorkList.add(work);
+
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -119,21 +156,11 @@ public class KuduGroupScan extends AbstractGroupScan {
   private static class KuduWork implements CompleteWork {
 
     private EndpointByteMapImpl byteMap = new EndpointByteMapImpl();
-    private byte[] partitionKeyStart;
-    private byte[] partitionKeyEnd;
+    private byte[] serializedScanToken;
 
 
-    public KuduWork(byte[] partitionKeyStart, byte[] partitionKeyEnd) {
-      this.partitionKeyStart = partitionKeyStart;
-      this.partitionKeyEnd = partitionKeyEnd;
-    }
-
-    public byte[] getPartitionKeyStart() {
-      return partitionKeyStart;
-    }
-
-    public byte[] getPartitionKeyEnd() {
-      return partitionKeyEnd;
+    public KuduWork(byte[] serializedScanToken) {
+      this.serializedScanToken = serializedScanToken;
     }
 
     @Override
@@ -149,6 +176,10 @@ public class KuduGroupScan extends AbstractGroupScan {
     @Override
     public int compareTo(CompleteWork o) {
       return 0;
+    }
+
+    public byte[] getSerializedScanToken() {
+      return serializedScanToken;
     }
   }
 
@@ -198,44 +229,6 @@ public class KuduGroupScan extends AbstractGroupScan {
     assignments = AssignmentCreator.getMappings(incomingEndpoints, kuduWorkList);
   }
 
-  public static byte[] serializePredicates(List<KuduPredicate> predicates) throws IOException {
-    ByteArrayOutputStream bos = new ByteArrayOutputStream();
-    ObjectOutputStream os = new ObjectOutputStream(bos);
-
-    os.writeInt(predicates.size());
-
-    for (KuduPredicate pred : predicates) {
-      byte[] arr = pred.toPB().toByteArray();
-      os.writeInt(arr.length);
-      os.write(arr);
-    }
-
-    os.close();
-    return bos.toByteArray();
-  }
-
-  public static List<KuduPredicate> deserializePredicates(Schema tableSchema, byte[] serializedPredicates) throws IOException {
-    ByteArrayInputStream bis = new ByteArrayInputStream(serializedPredicates);
-    ObjectInputStream ois = new ObjectInputStream(bis);
-
-    int predicatesCount = ois.readInt();
-    List<KuduPredicate> predicates = new ArrayList<>();
-
-    for (int i = 0; i < predicatesCount; i++) {
-      int len = ois.readInt();
-      byte[] arr = new byte[len];
-      ois.readFully(arr, 0, len);
-
-      Common.ColumnPredicatePB colPredicate = Common.ColumnPredicatePB.parseFrom(arr);
-      predicates.add(KuduPredicate.fromPB(tableSchema, colPredicate));
-    }
-
-    ois.close();
-
-    return predicates;
-  }
-
-
   @Override
   public KuduSubScan getSpecificScan(int minorFragmentId) {
     List<KuduWork> workList = assignments.get(minorFragmentId);
@@ -246,12 +239,8 @@ public class KuduGroupScan extends AbstractGroupScan {
     // FIXME: just for easy debugging purposes
     System.out.println(kuduScanSpec.toString());
 
-    try {
-      for (KuduWork work : workList) {
-        scanSpecList.add(new KuduSubScanSpec(getTableName(), work.getPartitionKeyStart(), work.getPartitionKeyEnd(), serializePredicates(kuduScanSpec.getPredicates())));
-      }
-    } catch (IOException ioe) {
-      throw new RuntimeException(ioe);
+    for (KuduWork work : workList) {
+      scanSpecList.add(new KuduSubScanSpec(getTableName(), work.getSerializedScanToken()));
     }
 
     return new KuduSubScan(storagePlugin, storagePluginConfig, scanSpecList, this.columns);

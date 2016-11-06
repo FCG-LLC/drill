@@ -98,44 +98,14 @@ public class KuduRecordReader extends AbstractRecordReader {
     this.output = output;
     this.context = context;
     try {
-      final KuduTable table = client.openTable(scanSpec.getTableName());
-      final Schema tableSchema = table.getSchema();
-
-      KuduScannerBuilder builder = client.newScannerBuilder(table);
-      if (!isStarQuery()) {
-        List<String> colNames = Lists.newArrayList();
-        for (SchemaPath p : this.getColumns()) {
-          colNames.add(p.getAsUnescapedPath());
-        }
-
-        // We must set projected columns in order, otherwise nasty things
-        // related to primary (composite) key columns might happen
-        Collections.sort(colNames, new Comparator<String>() {
-            @Override
-            public int compare(String o1, String o2) {
-                return table.getSchema().getColumnIndex(o1) - table.getSchema().getColumnIndex(o2);
-            }
-        });
-
-        builder.setProjectedColumnNames(colNames);
-      }
-
-      if (scanSpec.getPredicates() != null) {
-        List<KuduPredicate> predicates = KuduGroupScan.deserializePredicates(tableSchema, scanSpec.getPredicates());
-        for (KuduPredicate pred : predicates) {
-          builder.addPredicate(pred);
-        }
-      }
-
       context.getStats().startWait();
+
       try {
-        scanner = builder
-                .lowerBoundRaw(scanSpec.getStartKey())
-                .exclusiveUpperBoundRaw(scanSpec.getEndKey())
-            .build();
+        scanner = scanSpec.deserializeIntoScanner(client);
       } finally {
         context.getStats().stopWait();
       }
+
     } catch (Exception e) {
       throw new ExecutionSetupException(e);
     }
@@ -243,8 +213,13 @@ public class KuduRecordReader extends AbstractRecordReader {
       case BINARY: {
         ByteBuffer value = result.getBinary(pci.index);
         if (pci.kuduColumn.isNullable()) {
-          ((NullableVarBinaryVector.Mutator) pci.vv.getMutator())
-              .setSafe(rowIndex, value, 0, value.remaining());
+          if (result.isNull(pci.index)) {
+            ((NullableVarBinaryVector.Mutator) pci.vv.getMutator())
+                    .setNull(rowIndex);
+          } else {
+            ((NullableVarBinaryVector.Mutator) pci.vv.getMutator())
+                    .setSafe(rowIndex, value, 0, value.remaining());
+          }
         } else {
           ((VarBinaryVector.Mutator) pci.vv.getMutator())
               .setSafe(rowIndex, value, 0, value.remaining());
@@ -252,20 +227,26 @@ public class KuduRecordReader extends AbstractRecordReader {
         break;
       }
       case STRING: {
-        ByteBuffer value = result.getBinary(pci.index);
         if (pci.kuduColumn.isNullable()) {
-          ((NullableVarCharVector.Mutator) pci.vv.getMutator())
-              .setSafe(rowIndex, value, 0, value.remaining());
+          if (result.isNull(pci.index)) {
+            ((NullableVarCharVector.Mutator) pci.vv.getMutator()).setNull(pci.index);
+          } else {
+            ((NullableVarCharVector.Mutator) pci.vv.getMutator()).set(rowIndex, result.getString(pci.index).getBytes());
+          }
         } else {
-          ((VarCharVector.Mutator) pci.vv.getMutator())
-              .setSafe(rowIndex, value, 0, value.remaining());
+          ((VarCharVector.Mutator) pci.vv.getMutator()).setSafe(rowIndex, result.getString(pci.index).getBytes());
         }
         break;
       }
       case BOOL:
         if (pci.kuduColumn.isNullable()) {
-          ((NullableBitVector.Mutator) pci.vv.getMutator())
-              .setSafe(rowIndex, result.getBoolean(pci.index) ? 1 : 0);
+          if (result.isNull(pci.index)) {
+            ((NullableBitVector.Mutator) pci.vv.getMutator())
+                    .setNull(rowIndex);
+          } else {
+            ((NullableBitVector.Mutator) pci.vv.getMutator())
+                    .setSafe(rowIndex, result.getBoolean(pci.index) ? 1 : 0);
+          }
         } else {
           ((BitVector.Mutator) pci.vv.getMutator())
               .setSafe(rowIndex, result.getBoolean(pci.index) ? 1 : 0);
@@ -273,8 +254,13 @@ public class KuduRecordReader extends AbstractRecordReader {
         break;
       case DOUBLE:
         if (pci.kuduColumn.isNullable()) {
-          ((NullableFloat8Vector.Mutator) pci.vv.getMutator())
-              .setSafe(rowIndex, result.getDouble(pci.index));
+          if (result.isNull(pci.index)) {
+            ((NullableFloat8Vector.Mutator) pci.vv.getMutator())
+                    .setNull(rowIndex);
+          } else {
+            ((NullableFloat8Vector.Mutator) pci.vv.getMutator())
+                    .setSafe(rowIndex, result.getDouble(pci.index));
+          }
         } else {
           ((Float8Vector.Mutator) pci.vv.getMutator())
               .setSafe(rowIndex, result.getDouble(pci.index));
@@ -282,8 +268,13 @@ public class KuduRecordReader extends AbstractRecordReader {
         break;
       case FLOAT:
         if (pci.kuduColumn.isNullable()) {
-          ((NullableFloat4Vector.Mutator) pci.vv.getMutator())
-              .setSafe(rowIndex, result.getFloat(pci.index));
+          if (result.isNull(pci.index)) {
+            ((NullableFloat4Vector.Mutator) pci.vv.getMutator())
+                    .setNull(rowIndex);
+          } else {
+            ((NullableFloat4Vector.Mutator) pci.vv.getMutator())
+                    .setSafe(rowIndex, result.getFloat(pci.index));
+          }
         } else {
           ((Float4Vector.Mutator) pci.vv.getMutator())
               .setSafe(rowIndex, result.getFloat(pci.index));
@@ -291,8 +282,13 @@ public class KuduRecordReader extends AbstractRecordReader {
         break;
       case INT16:
         if (pci.kuduColumn.isNullable()) {
-          ((NullableIntVector.Mutator) pci.vv.getMutator())
-              .setSafe(rowIndex, result.getShort(pci.index));
+          if (result.isNull(pci.index)) {
+            ((NullableIntVector.Mutator) pci.vv.getMutator())
+                    .setNull(rowIndex);
+          } else {
+            ((NullableIntVector.Mutator) pci.vv.getMutator())
+                    .setSafe(rowIndex, result.getShort(pci.index));
+          }
         } else {
           ((IntVector.Mutator) pci.vv.getMutator())
               .setSafe(rowIndex, result.getShort(pci.index));
@@ -300,8 +296,13 @@ public class KuduRecordReader extends AbstractRecordReader {
         break;
       case INT32:
         if (pci.kuduColumn.isNullable()) {
-          ((NullableIntVector.Mutator) pci.vv.getMutator())
-              .setSafe(rowIndex, result.getInt(pci.index));
+          if (result.isNull(pci.index)) {
+            ((NullableIntVector.Mutator) pci.vv.getMutator())
+                    .setNull(rowIndex);
+          } else {
+            ((NullableIntVector.Mutator) pci.vv.getMutator())
+                    .setSafe(rowIndex, result.getInt(pci.index));
+          }
         } else {
           ((IntVector.Mutator) pci.vv.getMutator())
               .setSafe(rowIndex, result.getInt(pci.index));
@@ -309,8 +310,13 @@ public class KuduRecordReader extends AbstractRecordReader {
         break;
       case INT8:
         if (pci.kuduColumn.isNullable()) {
-          ((NullableIntVector.Mutator) pci.vv.getMutator())
-              .setSafe(rowIndex, result.getByte(pci.index));
+          if (result.isNull(pci.index)) {
+            ((NullableIntVector.Mutator) pci.vv.getMutator())
+                    .setNull(rowIndex);
+          } else {
+            ((NullableIntVector.Mutator) pci.vv.getMutator())
+                    .setSafe(rowIndex, result.getByte(pci.index));
+          }
         } else {
           ((IntVector.Mutator) pci.vv.getMutator())
               .setSafe(rowIndex, result.getByte(pci.index));
@@ -318,17 +324,27 @@ public class KuduRecordReader extends AbstractRecordReader {
         break;
       case INT64:
         if (pci.kuduColumn.isNullable()) {
-          ((NullableBigIntVector.Mutator) pci.vv.getMutator())
-              .setSafe(rowIndex, result.getLong(pci.index));
+          if (result.isNull(pci.index)) {
+            ((NullableBigIntVector.Mutator) pci.vv.getMutator())
+             .setNull(rowIndex);
+          } else {
+            ((NullableBigIntVector.Mutator) pci.vv.getMutator())
+             .setSafe(rowIndex, result.getLong(pci.index));
+          }
         } else {
           ((BigIntVector.Mutator) pci.vv.getMutator())
-              .setSafe(rowIndex, result.getLong(pci.index));
+             .setSafe(rowIndex, result.getLong(pci.index));
         }
         break;
-        case UNIXTIME_MICROS:
+      case UNIXTIME_MICROS:
         if (pci.kuduColumn.isNullable()) {
-          ((NullableTimeStampVector.Mutator) pci.vv.getMutator())
+          if (result.isNull(pci.index)) {
+            ((NullableTimeStampVector.Mutator) pci.vv.getMutator())
+              .setNull(rowIndex);
+          } else {
+            ((NullableTimeStampVector.Mutator) pci.vv.getMutator())
               .setSafe(rowIndex, result.getLong(pci.index) / 1000);
+          }
         } else {
           ((TimeStampVector.Mutator) pci.vv.getMutator())
               .setSafe(rowIndex, result.getLong(pci.index) / 1000);

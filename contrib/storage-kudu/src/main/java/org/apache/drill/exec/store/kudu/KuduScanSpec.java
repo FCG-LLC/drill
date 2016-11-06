@@ -69,7 +69,7 @@ public class KuduScanSpec {
     StringBuilder sb = new StringBuilder();
     sb.append("Predicates on table ");
     sb.append(tableName);
-    sb.append(" = ");
+    sb.append(": ");
     boolean hasPrev = false;
     for (KuduPredicate pred : predicates) {
       if (hasPrev) {

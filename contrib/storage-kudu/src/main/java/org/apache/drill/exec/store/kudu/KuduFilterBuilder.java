@@ -234,7 +234,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                     } else {
                         String strMin = likeConstraint.split("%")[0];
                         String strMax = strMin.substring(0, strMin.length()-1);
-                        strMax = strMax + strMin.charAt(strMin.length()-1)+1; // FIXME: how this works? 255 character anyone?
+                        strMax = strMax + ((char) (strMin.charAt(strMin.length()-1)+1)); // FIXME: how this works? 255 character anyone?
 
                         KuduPredicate minPredicate = KuduPredicate.newComparisonPredicate(colSchema, KuduPredicate.ComparisonOp.GREATER_EQUAL, strMin);
                         KuduPredicate maxPredicate = KuduPredicate.newComparisonPredicate(colSchema, KuduPredicate.ComparisonOp.LESS, strMax);

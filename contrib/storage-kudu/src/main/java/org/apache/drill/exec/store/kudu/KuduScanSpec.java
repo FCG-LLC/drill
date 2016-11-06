@@ -19,6 +19,7 @@ package org.apache.drill.exec.store.kudu;
 
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.ColumnRangePredicate;
@@ -31,35 +32,29 @@ import java.util.List;
 public class KuduScanSpec {
 
   private final String tableName;
-  private final Schema kuduTableSchema;
   private List<KuduPredicate> predicates = new ArrayList<>();
 
   @JsonCreator
-  public KuduScanSpec(@JsonProperty("tableName") String tableName, @JsonProperty("tableSchema") Schema kuduTableSchema) {
+  public KuduScanSpec(@JsonProperty("tableName") String tableName) {
     this.tableName = tableName;
-    this.kuduTableSchema = kuduTableSchema;
   }
 
-  public KuduScanSpec(@JsonProperty("tableName") String tableName, @JsonProperty("tableSchema") Schema kuduTableSchema, @JsonProperty("predicates") KuduPredicate pred) {
+  public KuduScanSpec(@JsonProperty("tableName") String tableName, @JsonProperty("predicates") KuduPredicate pred) {
     this.tableName = tableName;
-    this.kuduTableSchema = kuduTableSchema;
     this.predicates.add(pred);
   }
 
-  public KuduScanSpec(@JsonProperty("tableName") String tableName, @JsonProperty("tableSchema") Schema kuduTableSchema, @JsonProperty("predicates") Collection<KuduPredicate> preds) {
+  public KuduScanSpec(@JsonProperty("tableName") String tableName, @JsonProperty("predicates") Collection<KuduPredicate> preds) {
     this.tableName = tableName;
-    this.kuduTableSchema = kuduTableSchema;
     this.predicates.addAll(preds);
   }
 
+//  @JsonIgnore
   public String getTableName() {
     return tableName;
   }
 
-  public Schema getKuduTableSchema() {
-    return kuduTableSchema;
-  }
-
+//  @JsonIgnore
   public List<KuduPredicate> getPredicates() {
     return predicates;
   }

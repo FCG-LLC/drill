@@ -80,7 +80,7 @@ public class KuduSchemaFactory implements SchemaFactory {
       try {
         KuduTable table = plugin.getClient().openTable(name);
         Schema schema = table.getSchema();
-        KuduScanSpec scanSpec = new KuduScanSpec(name, schema);
+        KuduScanSpec scanSpec = new KuduScanSpec(name);
         return new DrillKuduTable(schemaName, plugin, schema, scanSpec);
       } catch (Exception e) {
         logger.warn("Failure while retrieving kudu table {}", name, e);

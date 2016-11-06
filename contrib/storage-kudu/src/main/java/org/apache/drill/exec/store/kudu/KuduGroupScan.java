@@ -71,6 +71,9 @@ public class KuduGroupScan extends AbstractGroupScan {
   private ListMultimap<Integer,KuduWork> assignments;
   private List<EndpointAffinity> affinities;
 
+  private KuduClient client;
+  private KuduTable table;
+  private Schema tableSchema;
 
   @JsonCreator
   public KuduGroupScan(@JsonProperty("kuduScanSpec") KuduScanSpec kuduScanSpec,
@@ -87,13 +90,11 @@ public class KuduGroupScan extends AbstractGroupScan {
     this.storagePluginConfig = storagePlugin.getConfig();
     this.kuduScanSpec = scanSpec;
     this.columns = columns == null || columns.size() == 0? ALL_COLUMNS : columns;
+
     init();
   }
 
   private List<KuduScanToken> initScanTokens() throws KuduException {
-    final KuduClient client = storagePlugin.getClient();
-    final KuduTable table = client.openTable(kuduScanSpec.getTableName());
-    final Schema tableSchema = table.getSchema();
 
     KuduScanToken.KuduScanTokenBuilder scanTokenBuilder = client.newScanTokenBuilder(table);
 
@@ -124,7 +125,19 @@ public class KuduGroupScan extends AbstractGroupScan {
     return scanTokenBuilder.build();
   }
 
+  private void initFields() {
+    this.client = storagePlugin.getClient();
+    try {
+      this.table = client.openTable(kuduScanSpec.getTableName());
+      this.tableSchema = this.table.getSchema();
+    } catch (KuduException ke) {
+      throw new RuntimeException(ke);
+    }
+  }
+
   private void init() {
+    initFields();
+
     Collection<DrillbitEndpoint> endpoints = storagePlugin.getContext().getBits();
     Map<String,DrillbitEndpoint> endpointMap = Maps.newHashMap();
     for (DrillbitEndpoint endpoint : endpoints) {
@@ -132,7 +145,6 @@ public class KuduGroupScan extends AbstractGroupScan {
     }
 
     try {
-
       final List<KuduScanToken> scanTokens = initScanTokens();
 
       for (KuduScanToken scanToken : scanTokens) {
@@ -153,11 +165,14 @@ public class KuduGroupScan extends AbstractGroupScan {
     }
   }
 
-  private static class KuduWork implements CompleteWork {
+  @JsonIgnore
+  public Schema getTableSchema() { return this.tableSchema; }
 
+
+
+  private static class KuduWork implements CompleteWork {
     private EndpointByteMapImpl byteMap = new EndpointByteMapImpl();
     private byte[] serializedScanToken;
-
 
     public KuduWork(byte[] serializedScanToken) {
       this.serializedScanToken = serializedScanToken;
@@ -196,6 +211,8 @@ public class KuduGroupScan extends AbstractGroupScan {
     this.filterPushedDown = that.filterPushedDown;
     this.kuduWorkList = that.kuduWorkList;
     this.assignments = that.assignments;
+    this.table = that.table;
+    this.tableSchema = that.tableSchema;
   }
 
   @Override

@@ -33,6 +33,7 @@ import java.util.Date;
 import java.util.List;
 
 import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.Schema;
 import org.apache.kudu.Type;
 import org.apache.kudu.client.Bytes;
 import org.apache.kudu.client.ColumnRangePredicate;
@@ -41,6 +42,7 @@ import org.apache.kudu.client.KuduPredicate;
 public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, RuntimeException> {
 
     final private KuduGroupScan groupScan;
+    final private Schema tableSchema;
 
     final private LogicalExpression le;
 
@@ -50,6 +52,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
 
     KuduFilterBuilder(KuduGroupScan groupScan, LogicalExpression le) {
         this.groupScan = groupScan;
+        this.tableSchema = groupScan.getTableSchema();
         this.le = le;
     }
 
@@ -93,7 +96,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
         } else {
             switch (functionName) {
                 case "booleanAnd":
-                //case "booleanOr":
+                case "booleanOr":
                     KuduScanSpec firstScanSpec = args.get(0).accept(this, null);
                     for (int i = 1; i < args.size(); ++i) {
                         KuduScanSpec nextScanSpec = args.get(i).accept(this, null);
@@ -119,13 +122,26 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
     }
 
     private KuduScanSpec mergeScanSpecs(String functionName, KuduScanSpec leftScanSpec, KuduScanSpec rightScanSpec) {
-        KuduScanSpec mergedSpec = new KuduScanSpec(leftScanSpec.getTableName(), leftScanSpec.getKuduTableSchema());
+        KuduScanSpec mergedSpec = new KuduScanSpec(leftScanSpec.getTableName());
 
-        for (List<KuduPredicate> predicateList : Arrays.asList(leftScanSpec.getPredicates(), rightScanSpec.getPredicates())) {
-            for (KuduPredicate pred : predicateList) {
-                // Kudu API will handle merging predicates
-                mergedSpec.getPredicates().add(pred);
-            }
+        switch (functionName) {
+            case "booleanAnd":
+                for (List<KuduPredicate> predicateList : Arrays.asList(leftScanSpec.getPredicates(), rightScanSpec.getPredicates())) {
+                    for (KuduPredicate pred : predicateList) {
+                        // Kudu API will handle merging predicates
+                        mergedSpec.getPredicates().add(pred);
+                    }
+                }
+                break;
+            case "booleanOr":
+                System.out.println("What to do?");
+                for (List<KuduPredicate> predicateList : Arrays.asList(leftScanSpec.getPredicates(), rightScanSpec.getPredicates())) {
+                    for (KuduPredicate pred : predicateList) {
+                        System.out.println(pred);
+//                        mergedSpec.getPredicates().add(pred);
+                    }
+                }
+                break;
         }
 
         return mergedSpec;
@@ -159,7 +175,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
 
 
         String colName = field.getRootSegment().getPath();
-        ColumnSchema colSchema = groupScan.getKuduScanSpec().getKuduTableSchema().getColumn(colName);
+        ColumnSchema colSchema = tableSchema.getColumn(colName);
 
         // In case of String only:
         if (colSchema.getType() == Type.STRING && originalValue == null && fieldValue != null) {
@@ -241,7 +257,6 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
 
                         return new KuduScanSpec(
                                 groupScan.getTableName(),
-                                groupScan.getKuduScanSpec().getKuduTableSchema(),
                                 Arrays.asList(minPredicate, maxPredicate)
                         );
                     }
@@ -256,7 +271,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
         KuduPredicate predicate = new KuduPredicateFactory(colSchema, op).create(originalValue);
 
         if (predicate != null) {
-            return new KuduScanSpec(groupScan.getTableName(), groupScan.getKuduScanSpec().getKuduTableSchema(), predicate);
+            return new KuduScanSpec(groupScan.getTableName(), predicate);
         }
 
         return null;

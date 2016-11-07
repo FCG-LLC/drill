@@ -76,6 +76,9 @@ public class KuduScanSpec {
     return this.subSets.isEmpty() && this.predicates.size() == 1;
   }
 
+  @JsonIgnore
+  public boolean isEmpty() { return this.subSets.isEmpty() && this.predicates.isEmpty(); }
+
   public boolean isPushOr() {
     return pushOr;
   }

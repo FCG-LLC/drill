@@ -76,7 +76,6 @@ public class TestKuduFilterPushDown extends BaseKuduTest {
         PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
     }
 
-
     @Test
     public void testFilterPushDownRowKeyMutualOrAndIn() throws Exception {
         setColumnWidths(new int[] {8, 38, 38});

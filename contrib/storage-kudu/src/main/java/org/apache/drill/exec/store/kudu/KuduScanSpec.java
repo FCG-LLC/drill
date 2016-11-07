@@ -30,6 +30,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import static org.apache.drill.exec.store.kudu.KuduStoragePlugin.logger;
+
 public class KuduScanSpec {
 
   private final String tableName;
@@ -65,8 +67,12 @@ public class KuduScanSpec {
     return pushOr;
   }
 
-  public void addSubSet(KuduScanSpec orSet) {
-    this.subSets.add(orSet);
+  public void addSubSet(KuduScanSpec subSet) {
+    if (!subSet.getPredicates().isEmpty() || !subSet.getSubSets().isEmpty()) {
+      this.subSets.add(subSet);
+    } else {
+      logger.debug("Trying to add empty subset into scan. Ignoring.");
+    }
   }
 
   public List<KuduScanSpec> getSubSets() {
@@ -108,7 +114,13 @@ public class KuduScanSpec {
 
     for (KuduScanSpec subSet : subSets) {
       if (hasPrev) {
-        sb.append(", ");
+        if (isPushOr()) {
+          sb.append(" OR ");
+        } else {
+          sb.append(" AND ");
+        }
+      } else {
+        hasPrev = true;
       }
 
       sb.append("{");

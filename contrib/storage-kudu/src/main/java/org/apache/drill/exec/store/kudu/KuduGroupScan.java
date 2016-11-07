@@ -110,7 +110,7 @@ public class KuduGroupScan extends AbstractGroupScan {
     //
     // With all this scan tokens Drill should handle the rest
     //
-    permutateScanSpec(predicatePermutationSets, kuduScanSpec);
+    predicatePermutationSets = permutateScanSpec(predicatePermutationSets, kuduScanSpec);
 
     for (List<KuduPredicate> predicateSet : predicatePermutationSets) {
       KuduScanToken.KuduScanTokenBuilder scanTokenBuilder = client.newScanTokenBuilder(table);
@@ -146,38 +146,72 @@ public class KuduGroupScan extends AbstractGroupScan {
     return allScanTokens;
   }
 
-  private void permutateScanSpec(List<List<KuduPredicate>> predicatePermutationSets, KuduScanSpec scanSpec) {
-    // Get regular entries
-    if (scanSpec.getPredicates() != null) {
-      if (scanSpec.isPushOr()) {
-        // Permutate
-        List<List<KuduPredicate>> newLists = new ArrayList<>();
+  private List<List<KuduPredicate>> permutateScanSpec(List<List<KuduPredicate>> inputPermutationSets, KuduScanSpec scanSpec) {
+    List<List<KuduPredicate>> newLists = new ArrayList<>();
 
-        for (List<KuduPredicate> list : predicatePermutationSets) {
-          for (KuduPredicate pred : scanSpec.getPredicates()) {
-            List<KuduPredicate> newList = new ArrayList<>(list);
-            newList.add(pred);
-            newLists.add(newList);
-          }
-        }
+    if (scanSpec.isPushOr()) {
+      // We are going to expand the tree with new options. Wunderbar!
 
-        // Update the permutation set
-        predicatePermutationSets.clear();
-        predicatePermutationSets.addAll(newLists);
-      } else {
-        // Just add to all current lists (sets)
+      for (List<KuduPredicate> list : inputPermutationSets) {
         for (KuduPredicate pred : scanSpec.getPredicates()) {
-          for (List<KuduPredicate> permutationSet : predicatePermutationSets) {
-            permutationSet.add(pred);
-          }
+          List<KuduPredicate> newList = new ArrayList<>(list);
+          newList.add(pred);
+          newLists.add(newList);
         }
+      }
+
+      for (KuduScanSpec subSet : scanSpec.getSubSets()) {
+        newLists.addAll(permutateScanSpec(inputPermutationSets, subSet));
+      }
+    } else {
+      // This is just AND, so add constraints to the current set
+      for (List<KuduPredicate> list : inputPermutationSets) {
+        List<KuduPredicate> newList = new ArrayList<>(list);
+        for (KuduPredicate pred : scanSpec.getPredicates()) {
+          newList.add(pred);
+        }
+        newLists.add(newList);
+      }
+
+      for (KuduScanSpec subSet : scanSpec.getSubSets()) {
+        // This is probably wrong
+        newLists.addAll(permutateScanSpec(inputPermutationSets, subSet));
       }
     }
 
-    for (KuduScanSpec subSet : scanSpec.getSubSets()) {
-      permutateScanSpec(predicatePermutationSets, subSet);
-    }
+    return newLists;
   }
+
+//  // Get regular entries
+//  if (scanSpec.getPredicates() != null) {
+//    if (scanSpec.isPushOr()) {
+//      // Permutate
+//      List<List<KuduPredicate>> newLists = new ArrayList<>();
+//
+//      for (List<KuduPredicate> list : predicatePermutationSets) {
+//        for (KuduPredicate pred : scanSpec.getPredicates()) {
+//          List<KuduPredicate> newList = new ArrayList<>(list);
+//          newList.add(pred);
+//          newLists.add(newList);
+//        }
+//      }
+//
+//      // Update the permutation set
+//      predicatePermutationSets.clear();
+//      predicatePermutationSets.addAll(newLists);
+//    } else {
+//      // Just add to all current lists (sets)
+//      for (KuduPredicate pred : scanSpec.getPredicates()) {
+//        for (List<KuduPredicate> permutationSet : predicatePermutationSets) {
+//          permutationSet.add(pred);
+//        }
+//      }
+//    }
+//  }
+//
+//  for (KuduScanSpec subSet : scanSpec.getSubSets()) {
+//    permutateScanSpec(predicatePermutationSets, subSet);
+//  }
 
   private void initFields() {
     this.client = storagePlugin.getClient();

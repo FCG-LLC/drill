@@ -58,23 +58,23 @@ public class TestKuduFilterPushDown extends BaseKuduTest {
         final String sqlKudu = canonizeKuduSQL(sql);
         PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
     }
-
-    @Ignore
-    public void testFilterPushDownRowKeyMutualOrAndIn() throws Exception {
-        setColumnWidths(new int[] {8, 38, 38});
-        final String sql = "SELECT\n"
-                + "  key1\n"
-                + "FROM\n"
-                + "  [TABLE_NAME]\n"
-                + "WHERE\n"
-                + "  (key1 >= 1 AND key2 = 'a') OR (key1 = 3 AND key2 IN ('a','b'))";
-
-        runKuduSQLVerifyCount(sql, 2);
-
-        final String[] expectedPlan = {".*Predicates on table test_foo: `key1` >= 1\\, \\{`key2` = \"a\" OR `key2` = \"b\"\\}.*"};
-        final String[] excludedPlan ={};
-        final String sqlKudu = canonizeKuduSQL(sql);
-        PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
-    }
+//
+//    @Ignore
+//    public void testFilterPushDownRowKeyMutualOrAndIn() throws Exception {
+//        setColumnWidths(new int[] {8, 38, 38});
+//        final String sql = "SELECT\n"
+//                + "  key1\n"
+//                + "FROM\n"
+//                + "  [TABLE_NAME]\n"
+//                + "WHERE\n"
+//                + "  (key1 >= 1 AND key2 = 'a') OR (key1 = 3 AND key2 IN ('a','b'))";
+//
+//        runKuduSQLVerifyCount(sql, 2);
+//
+//        final String[] expectedPlan = {".*Predicates on table test_foo: `key1` >= 1\\, \\{`key2` = \"a\" OR `key2` = \"b\"\\}.*"};
+//        final String[] excludedPlan ={};
+//        final String sqlKudu = canonizeKuduSQL(sql);
+//        PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
+//    }
 
 }

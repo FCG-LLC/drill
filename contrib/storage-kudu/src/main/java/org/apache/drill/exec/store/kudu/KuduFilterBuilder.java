@@ -150,7 +150,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                         mergedSpec.getSubSets().addAll(scanSpec.getSubSets());
                     } else {
                         // This means it is a separate set of constraints...
-                        mergedSpec.getSubSets().add(scanSpec);
+                        mergedSpec.addSubSet(scanSpec);
                     }
                 }
                 break;

@@ -182,37 +182,6 @@ public class KuduGroupScan extends AbstractGroupScan {
     return newLists;
   }
 
-//  // Get regular entries
-//  if (scanSpec.getPredicates() != null) {
-//    if (scanSpec.isPushOr()) {
-//      // Permutate
-//      List<List<KuduPredicate>> newLists = new ArrayList<>();
-//
-//      for (List<KuduPredicate> list : predicatePermutationSets) {
-//        for (KuduPredicate pred : scanSpec.getPredicates()) {
-//          List<KuduPredicate> newList = new ArrayList<>(list);
-//          newList.add(pred);
-//          newLists.add(newList);
-//        }
-//      }
-//
-//      // Update the permutation set
-//      predicatePermutationSets.clear();
-//      predicatePermutationSets.addAll(newLists);
-//    } else {
-//      // Just add to all current lists (sets)
-//      for (KuduPredicate pred : scanSpec.getPredicates()) {
-//        for (List<KuduPredicate> permutationSet : predicatePermutationSets) {
-//          permutationSet.add(pred);
-//        }
-//      }
-//    }
-//  }
-//
-//  for (KuduScanSpec subSet : scanSpec.getSubSets()) {
-//    permutateScanSpec(predicatePermutationSets, subSet);
-//  }
-
   private void initFields() {
     this.client = storagePlugin.getClient();
     try {
@@ -354,10 +323,21 @@ public class KuduGroupScan extends AbstractGroupScan {
   @Override
   public ScanStats getScanStats() {
     // Very naive - the more constraints the better...
-    int constraintsDenominator = kuduScanSpec.getPredicates().size() + 1;
-    long recordCount = (100000 / constraintsDenominator) * kuduWorkList.size();
+    //int constraintsDenominator = kuduScanSpec.getPredicates().size() + 1;
+    int constraintsDenominator = kuduScanSpecSize(0, kuduScanSpec) + 1;
+    //long recordCount = (100000 / constraintsDenominator) * kuduWorkList.size();
+    long recordCount = (100000 / constraintsDenominator);
 
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, recordCount, 1/((float) constraintsDenominator), recordCount);
+  }
+
+  private int kuduScanSpecSize(int size, KuduScanSpec cur) {
+    size += cur.getPredicates().size();
+    for (KuduScanSpec next : cur.getSubSets()) {
+      size += kuduScanSpecSize(0, next);
+    }
+
+    return size;
   }
 
   @Override

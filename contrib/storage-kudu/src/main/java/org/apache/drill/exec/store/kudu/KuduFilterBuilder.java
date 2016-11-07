@@ -144,7 +144,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                 mergedSpec.setPushOr(true);
 
                 for (KuduScanSpec scanSpec : Arrays.asList(leftScanSpec, rightScanSpec)) {
-                    if (scanSpec.isPushOr()) { // FIXME: or single element?
+                    if (scanSpec.isPushOr() || (leftScanSpec.isAtomic() && rightScanSpec.isAtomic()) || (leftScanSpec.isAtomic() && rightScanSpec.isPushOr()) || (leftScanSpec.isPushOr() && rightScanSpec.isAtomic())) { // FIXME: or single element?
                         // This is simple, we just add its fields
                         mergedSpec.getPredicates().addAll(scanSpec.getPredicates());
                         mergedSpec.getSubSets().addAll(scanSpec.getSubSets());

@@ -50,6 +50,7 @@ import org.apache.drill.exec.store.schedule.AssignmentCreator;
 import org.apache.drill.exec.store.schedule.CompleteWork;
 import org.apache.drill.exec.store.schedule.EndpointByteMap;
 import org.apache.drill.exec.store.schedule.EndpointByteMapImpl;
+import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Common;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.*;
@@ -94,11 +95,170 @@ public class KuduGroupScan extends AbstractGroupScan {
     init();
   }
 
+  private KuduScanSpec collapseScanSpec(KuduScanSpec input) {
+    return new KuduScanSpecOptimizer(input).pruneScanSpec();
+  }
+
+  private class KuduScanSpecOptimizer {
+    private KuduScanSpec input;
+    private List<String> primaryKeys;
+//    private Set<String> commonAndColumns;
+
+    KuduScanSpecOptimizer(KuduScanSpec input) {
+      this.input = input;
+
+      primaryKeys = new ArrayList<>();
+      for (ColumnSchema columnSchema : table.getSchema().getPrimaryKeyColumns()) {
+        primaryKeys.add(columnSchema.getName());
+      }
+    }
+
+    private Set<String> findForbiddenORColumns(Set<String> inputCols) {
+      Set<String> leftCols = new HashSet<String>(inputCols);
+
+      for (String primaryKey : primaryKeys) {
+        if (inputCols.contains(primaryKey)) {
+          leftCols.remove(primaryKey);
+        } else {
+          // We have a gap - whatever is left should not be included in multiplicated OR query
+          return leftCols;
+        }
+      }
+
+      return leftCols;
+    }
+
+    private Set<KuduScanSpec> findORScansWithForbiddenColumns(List<KuduScanSpec> history, Set<String> forbiddenColumns) {
+      Set<KuduScanSpec> matched = new HashSet<>();
+
+      boolean orOnPath = false;
+
+      for (KuduScanSpec spec : history) {
+        if (spec.isPushOr()) {
+          orOnPath = true;
+        }
+
+        if (orOnPath) {
+          for (KuduPredicate pred : spec.getPredicates()) {
+            if (forbiddenColumns.contains(pred.toPB().getColumn())) {
+              matched.add(spec);
+            }
+          }
+        }
+      }
+
+      return matched;
+    }
+
+    private Set<KuduScanSpec> findPrunedScanSpecs(KuduScanSpec input) {
+      Set<KuduScanSpec> prunedScanSpecs = new HashSet<>();
+      List<KuduScanSpec> history = new ArrayList<>();
+      Set<String> inputCols = new HashSet<>();
+
+      traverse(inputCols, history, input, prunedScanSpecs);
+
+      return prunedScanSpecs;
+    }
+
+    public KuduScanSpec pruneScanSpec() {
+      KuduScanSpec base = input;
+
+      Set<KuduScanSpec> prunedSpecs = null;
+      do {
+        prunedSpecs = findPrunedScanSpecs(base);
+        KuduScanSpec newBase = new KuduScanSpec(base.getTableName());
+        rebuildScanSpec(base, newBase, prunedSpecs);
+
+        base = newBase;
+      } while (!prunedSpecs.isEmpty());
+
+      return base;
+    }
+
+    private void rebuildScanSpec(KuduScanSpec base, KuduScanSpec out, Set<KuduScanSpec> pruned) {
+      if (pruned.contains(base)) {
+        // skipped
+        return;
+      }
+
+      out.getPredicates().addAll(base.getPredicates());
+      out.setPushOr(base.isPushOr());
+
+      for (KuduScanSpec child : base.getSubSets()) {
+        if (!pruned.contains(child)) {
+          KuduScanSpec newBase = new KuduScanSpec(child.getTableName());
+          rebuildScanSpec(child, newBase, pruned);
+          out.getSubSets().add(newBase);
+        }
+      }
+
+    }
+
+    // We need to check if for leafs following conditions are valid:
+    //  (a) there is no "OR" in the path, or
+    //  (b) there is "OR" in the path and primary items up until the one occurring in OR are included
+    //      i.e. if we have primary key: k1, k2, k3, k4
+    //      following are OK:
+    //          k1 = 2 OR k1 = 3
+    //          k1 = 2 AND (k2 = 'a' OR k2 = 'b')
+    //          k1 = 2 AND (k2 = 'a' OR k2 = 'b') AND k4 = 100
+    //      following are NOT:
+    //          k2 = 'a' OR k2 = 'b'
+    //          k1 = 2 AND (k2 = 'a' OR k3 = 99999)
+    private void traverse(Set<String> inputCols, List<KuduScanSpec> history, KuduScanSpec cur, Set<KuduScanSpec> prunedScanSpecs) {
+      List<KuduScanSpec> nextHistory = new ArrayList<>(history);
+      nextHistory.add(cur);
+
+      if (cur.isPushOr()) {
+        // Alternative
+        if (cur.getSubSets().isEmpty()) {
+          // Leaf
+          for (KuduPredicate pred : cur.getPredicates()) {
+            Set<String> nextCols = new HashSet<>(inputCols);
+            nextCols.add(pred.toPB().getColumn());
+
+            Set<String> forbiddenORColumns = findForbiddenORColumns(nextCols);
+            prunedScanSpecs.addAll(findORScansWithForbiddenColumns(nextHistory, forbiddenORColumns));
+          }
+        } else {
+          // Has some dependencies - lets traverse
+          // Dependencies -- lets traverse
+          for (KuduScanSpec next : cur.getSubSets()) {
+            traverse(inputCols, nextHistory, next, prunedScanSpecs);
+          }
+        }
+      } else {
+        // Conjuction
+        Set<String> nextCols = new HashSet<>(inputCols);
+
+        for (KuduPredicate pred : cur.getPredicates()) {
+          nextCols.add(pred.toPB().getColumn());
+        }
+
+        if (cur.getSubSets().isEmpty()) {
+          // Leaf
+          Set<String> forbiddenORColumns = findForbiddenORColumns(nextCols);
+          prunedScanSpecs.addAll(findORScansWithForbiddenColumns(nextHistory, forbiddenORColumns));
+        } else {
+          // Dependencies -- lets traverse
+          for (KuduScanSpec next : cur.getSubSets()) {
+            traverse(nextCols, nextHistory, next, prunedScanSpecs);
+          }
+        }
+      }
+    }
+
+
+  }
+
   private List<KuduScanToken> initScanTokens() throws KuduException {
     ArrayList<KuduScanToken> allScanTokens = new ArrayList<>();
 
     List<List<KuduPredicate>> predicatePermutationSets = new ArrayList<>();
     predicatePermutationSets.add(new ArrayList<KuduPredicate>());
+
+    // We want to get rid of items that would be inefficient in the scan
+    kuduScanSpec = collapseScanSpec(kuduScanSpec);
 
     // Idea is following, if we have a scan spec:
     //     predicates: x > 0
@@ -147,6 +307,9 @@ public class KuduGroupScan extends AbstractGroupScan {
   }
 
   private List<List<KuduPredicate>> permutateScanSpec(List<List<KuduPredicate>> inputPermutationSets, KuduScanSpec scanSpec) {
+    if (scanSpec.getPredicates().isEmpty() && scanSpec.getSubSets().isEmpty())
+      return inputPermutationSets;
+
     List<List<KuduPredicate>> newLists = new ArrayList<>();
 
     if (scanSpec.isPushOr()) {
@@ -164,7 +327,7 @@ public class KuduGroupScan extends AbstractGroupScan {
         newLists.addAll(permutateScanSpec(inputPermutationSets, subSet));
       }
     } else {
-      // This is just AND, so add constraints to the current set
+      // This is AND, so add constraints to the current set
       for (List<KuduPredicate> list : inputPermutationSets) {
         List<KuduPredicate> newList = new ArrayList<>(list);
         for (KuduPredicate pred : scanSpec.getPredicates()) {
@@ -174,8 +337,7 @@ public class KuduGroupScan extends AbstractGroupScan {
       }
 
       for (KuduScanSpec subSet : scanSpec.getSubSets()) {
-        // This is probably wrong
-        newLists.addAll(permutateScanSpec(inputPermutationSets, subSet));
+        newLists = permutateScanSpec(newLists, subSet);
       }
     }
 

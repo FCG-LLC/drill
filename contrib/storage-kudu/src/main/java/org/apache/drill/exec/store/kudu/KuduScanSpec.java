@@ -55,12 +55,25 @@ public class KuduScanSpec {
     this.predicates.addAll(preds);
   }
 
+  @Override
+  protected KuduScanSpec clone() throws CloneNotSupportedException {
+    KuduScanSpec newOne = new KuduScanSpec(tableName, predicates);
+    newOne.pushOr = pushOr;
+    newOne.subSets = new ArrayList<>(subSets);
+    return newOne;
+  }
+
   public String getTableName() {
     return tableName;
   }
 
   public void setPushOr(boolean pushOr) {
     this.pushOr = pushOr;
+  }
+
+  @JsonIgnore
+  public boolean isAtomic() {
+    return this.subSets.isEmpty() && this.predicates.size() == 1;
   }
 
   public boolean isPushOr() {

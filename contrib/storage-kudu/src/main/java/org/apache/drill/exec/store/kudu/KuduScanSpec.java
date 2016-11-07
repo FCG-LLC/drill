@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.ColumnRangePredicate;
 import org.apache.kudu.client.KuduPredicate;
+import org.apache.kudu.client.KuduScanToken;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,6 +34,9 @@ public class KuduScanSpec {
 
   private final String tableName;
   private List<KuduPredicate> predicates = new ArrayList<>();
+  private List<KuduScanSpec> subSets = new ArrayList<>();
+
+  private boolean pushOr = false;
 
   @JsonCreator
   public KuduScanSpec(@JsonProperty("tableName") String tableName) {
@@ -49,32 +53,70 @@ public class KuduScanSpec {
     this.predicates.addAll(preds);
   }
 
-//  @JsonIgnore
   public String getTableName() {
     return tableName;
   }
 
-//  @JsonIgnore
+  public void setPushOr(boolean pushOr) {
+    this.pushOr = pushOr;
+  }
+
+  public boolean isPushOr() {
+    return pushOr;
+  }
+
+  public void addSubSet(KuduScanSpec orSet) {
+    this.subSets.add(orSet);
+  }
+
+  public List<KuduScanSpec> getSubSets() {
+    return this.subSets;
+  }
+
   public List<KuduPredicate> getPredicates() {
     return predicates;
   }
 
   @Override
   public String toString() {
+    return toString(false);
+  }
+
+  protected String toString(boolean simplified) {
+
     StringBuilder sb = new StringBuilder();
-    sb.append("Predicates on table ");
-    sb.append(tableName);
-    sb.append(": ");
+    if (!simplified) {
+      sb.append("Predicates on table ");
+      sb.append(tableName);
+      sb.append(": ");
+    }
+
     boolean hasPrev = false;
     for (KuduPredicate pred : predicates) {
       if (hasPrev) {
-        sb.append(", ");
+        if (isPushOr()) {
+          sb.append(" OR ");
+        } else {
+          sb.append(" AND ");
+        }
       } else {
         hasPrev = true;
       }
 
       sb.append(pred.toString());
     }
+
+    for (KuduScanSpec subSet : subSets) {
+      if (hasPrev) {
+        sb.append(", ");
+      }
+
+      sb.append("{");
+      sb.append(subSet.toString(true));
+      sb.append("}");
+    }
+
+
 
     return sb.toString();
   }

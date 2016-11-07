@@ -59,7 +59,11 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
     public KuduScanSpec parseTree() {
         KuduScanSpec parsedSpec = le.accept(this, null);
         if (parsedSpec != null) {
-            parsedSpec = mergeScanSpecs("booleanAnd", this.groupScan.getKuduScanSpec(), parsedSpec);
+            if (parsedSpec.isPushOr()) {
+                parsedSpec = mergeScanSpecs("booleanOr", this.groupScan.getKuduScanSpec(), parsedSpec);
+            } else {
+                parsedSpec = mergeScanSpecs("booleanAnd", this.groupScan.getKuduScanSpec(), parsedSpec);
+            }
         }
         return parsedSpec;
     }
@@ -126,19 +130,27 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
 
         switch (functionName) {
             case "booleanAnd":
-                for (List<KuduPredicate> predicateList : Arrays.asList(leftScanSpec.getPredicates(), rightScanSpec.getPredicates())) {
-                    for (KuduPredicate pred : predicateList) {
+                for (KuduScanSpec scanSpec : Arrays.asList(leftScanSpec, rightScanSpec)) {
+                    if (scanSpec.isPushOr()) {
+                        mergedSpec.addSubSet(scanSpec);
+                    } else {
                         // Kudu API will handle merging predicates
-                        mergedSpec.getPredicates().add(pred);
+                        mergedSpec.getPredicates().addAll(scanSpec.getPredicates());
+                        mergedSpec.getSubSets().addAll(scanSpec.getSubSets());
                     }
                 }
                 break;
             case "booleanOr":
-                System.out.println("What to do?");
-                for (List<KuduPredicate> predicateList : Arrays.asList(leftScanSpec.getPredicates(), rightScanSpec.getPredicates())) {
-                    for (KuduPredicate pred : predicateList) {
-                        System.out.println(pred);
-//                        mergedSpec.getPredicates().add(pred);
+                mergedSpec.setPushOr(true);
+
+                for (KuduScanSpec scanSpec : Arrays.asList(leftScanSpec, rightScanSpec)) {
+                    if (scanSpec.isPushOr()) { // FIXME: or single element?
+                        // This is simple, we just add its fields
+                        mergedSpec.getPredicates().addAll(scanSpec.getPredicates());
+                        mergedSpec.getSubSets().addAll(scanSpec.getSubSets());
+                    } else {
+                        // This means it is a separate set of constraints...
+                        mergedSpec.getSubSets().add(scanSpec);
                     }
                 }
                 break;

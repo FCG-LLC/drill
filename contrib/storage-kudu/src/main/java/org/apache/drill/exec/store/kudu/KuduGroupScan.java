@@ -95,34 +95,88 @@ public class KuduGroupScan extends AbstractGroupScan {
   }
 
   private List<KuduScanToken> initScanTokens() throws KuduException {
+    ArrayList<KuduScanToken> allScanTokens = new ArrayList<>();
 
-    KuduScanToken.KuduScanTokenBuilder scanTokenBuilder = client.newScanTokenBuilder(table);
+    List<List<KuduPredicate>> predicatePermutationSets = new ArrayList<>();
+    predicatePermutationSets.add(new ArrayList<KuduPredicate>());
 
-    if (!AbstractRecordReader.isStarQuery(columns)) {
-      List<String> colNames = Lists.newArrayList();
-      for (SchemaPath p : this.getColumns()) {
-        colNames.add(p.getAsUnescapedPath());
+    // Idea is following, if we have a scan spec:
+    //     predicates: x > 0
+    //     orSet:
+    //        predicates: y = 10, y = 20
+    // We will want to convert it to two scans (permutate it):
+    //     x > 0 and y = 10
+    //     x > = and y = 20
+    //
+    // With all this scan tokens Drill should handle the rest
+    //
+    permutateScanSpec(predicatePermutationSets, kuduScanSpec);
+
+    for (List<KuduPredicate> predicateSet : predicatePermutationSets) {
+      KuduScanToken.KuduScanTokenBuilder scanTokenBuilder = client.newScanTokenBuilder(table);
+
+      if (!AbstractRecordReader.isStarQuery(columns)) {
+        List<String> colNames = Lists.newArrayList();
+        for (SchemaPath p : this.getColumns()) {
+          colNames.add(p.getAsUnescapedPath());
+        }
+
+        // We must set projected columns in order, otherwise nasty things
+        // related to primary (composite) key columns might happen
+        Collections.sort(colNames, new Comparator<String>() {
+          @Override
+          public int compare(String o1, String o2) {
+            return table.getSchema().getColumnIndex(o1) - table.getSchema().getColumnIndex(o2);
+          }
+        });
+
+        scanTokenBuilder.setProjectedColumnNames(colNames);
       }
 
-      // We must set projected columns in order, otherwise nasty things
-      // related to primary (composite) key columns might happen
-      Collections.sort(colNames, new Comparator<String>() {
-        @Override
-        public int compare(String o1, String o2) {
-          return table.getSchema().getColumnIndex(o1) - table.getSchema().getColumnIndex(o2);
-        }
-      });
+      KuduScanSpec pseudoScanSpec = new KuduScanSpec(getTableName(), predicateSet);
+      System.out.println(pseudoScanSpec.toString());
 
-      scanTokenBuilder.setProjectedColumnNames(colNames);
-    }
-
-    if (kuduScanSpec.getPredicates() != null) {
-      for (KuduPredicate pred : kuduScanSpec.getPredicates()) {
+      for (KuduPredicate pred : predicateSet) {
         scanTokenBuilder.addPredicate(pred);
       }
+
+      allScanTokens.addAll(scanTokenBuilder.build());
     }
 
-    return scanTokenBuilder.build();
+    return allScanTokens;
+  }
+
+  private void permutateScanSpec(List<List<KuduPredicate>> predicatePermutationSets, KuduScanSpec scanSpec) {
+    // Get regular entries
+    if (scanSpec.getPredicates() != null) {
+      if (scanSpec.isPushOr()) {
+        // Permutate
+        List<List<KuduPredicate>> newLists = new ArrayList<>();
+
+        for (List<KuduPredicate> list : predicatePermutationSets) {
+          for (KuduPredicate pred : scanSpec.getPredicates()) {
+            List<KuduPredicate> newList = new ArrayList<>(list);
+            newList.add(pred);
+            newLists.add(newList);
+          }
+        }
+
+        // Update the permutation set
+        predicatePermutationSets.clear();
+        predicatePermutationSets.addAll(newLists);
+      } else {
+        // Just add to all current lists (sets)
+        for (KuduPredicate pred : scanSpec.getPredicates()) {
+          for (List<KuduPredicate> permutationSet : predicatePermutationSets) {
+            permutationSet.add(pred);
+          }
+        }
+      }
+    }
+
+    for (KuduScanSpec subSet : scanSpec.getSubSets()) {
+      permutateScanSpec(predicatePermutationSets, subSet);
+    }
   }
 
   private void initFields() {
@@ -253,8 +307,6 @@ public class KuduGroupScan extends AbstractGroupScan {
     List<KuduSubScanSpec> scanSpecList = Lists.newArrayList();
 
     logger.info(kuduScanSpec.toString());
-    // FIXME: just for easy debugging purposes
-    System.out.println(kuduScanSpec.toString());
 
     for (KuduWork work : workList) {
       scanSpecList.add(new KuduSubScanSpec(getTableName(), work.getSerializedScanToken()));

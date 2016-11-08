@@ -45,13 +45,6 @@ class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpr
     private String functionName;
     private boolean sortOrderAscending;
 
-    // Fields for row-key prefix comparison
-    // If the query is on row-key prefix, we cannot use a standard template to identify startRow, stopRow and filter
-    // Hence, we use these local variables(set depending upon the encoding type in user query)
-    private boolean isRowKeyPrefixComparison;
-    byte[] rowKeyPrefixStartRow;
-    byte[] rowKeyPrefixStopRow;
-
     public static boolean isCompareFunction(String functionName) {
         return COMPARE_FUNCTIONS_TRANSPOSE_MAP.keySet().contains(functionName);
     }
@@ -83,7 +76,6 @@ class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpr
         this.functionName = functionName;
         this.isEqualityFn = COMPARE_FUNCTIONS_TRANSPOSE_MAP.containsKey(functionName)
                 && COMPARE_FUNCTIONS_TRANSPOSE_MAP.get(functionName).equals(functionName);
-        this.isRowKeyPrefixComparison = false;
         this.sortOrderAscending = true;
     }
 
@@ -105,18 +97,6 @@ class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpr
 
     public String getFunctionName() {
         return functionName;
-    }
-
-    public boolean isRowKeyPrefixComparison() {
-        return isRowKeyPrefixComparison;
-    }
-
-    public byte[] getRowKeyPrefixStartRow() {
-        return rowKeyPrefixStartRow;
-    }
-
-    public byte[] getRowKeyPrefixStopRow() {
-        return rowKeyPrefixStopRow;
     }
 
     public boolean isSortOrderAscending() {
@@ -166,22 +146,18 @@ class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpr
                     return false;
                 }
 
-                // FIXME: this was removed without much thought
-                boolean isRowKey = false;
-                //boolean isRowKey =((SchemaPath)nameArg).getAsUnescapedPath().equals(DrillHBaseConstants.ROW_KEY);
 
                 int offset = ((ValueExpressions.IntExpression)valueArg1).getInt();
 
-                if (!isRowKey || (offset != 1)) {
+                // Not sure how to interpret this
+                if (offset != 1) {
+                    System.out.println("Fixme: IDK what I am doing");
                     return false;
                 }
 
                 this.path    = (SchemaPath)nameArg;
-                prefixLength = ((ValueExpressions.IntExpression)valueArg2).getInt();
-                this.isRowKeyPrefixComparison = true;
-                // FIXME: another thing removed
+
                 return false;
-                //return visitRowKeyPrefixConvertExpression(e, prefixLength, valueArg);
             }
 
             if (e.getInput() instanceof SchemaPath) {

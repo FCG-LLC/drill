@@ -50,13 +50,9 @@ import org.apache.drill.exec.store.schedule.AssignmentCreator;
 import org.apache.drill.exec.store.schedule.CompleteWork;
 import org.apache.drill.exec.store.schedule.EndpointByteMap;
 import org.apache.drill.exec.store.schedule.EndpointByteMapImpl;
-import org.apache.kudu.ColumnSchema;
-import org.apache.kudu.Common;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.*;
 import org.apache.kudu.client.LocatedTablet.Replica;
-
-import static org.apache.drill.exec.store.AbstractRecordReader.STAR_COLUMN;
 
 @JsonTypeName("kudu-scan")
 public class KuduGroupScan extends AbstractGroupScan {
@@ -127,7 +123,10 @@ public class KuduGroupScan extends AbstractGroupScan {
       }
 
       KuduScanSpec pseudoScanSpec = new KuduScanSpec(getTableName(), predicateSet);
-      System.out.println(pseudoScanSpec.toString());
+      logger.info("Generated scan spec: {}", pseudoScanSpec.toString());
+
+      // Remove it
+      System.out.println("Generated scan spec: " + pseudoScanSpec.toString());
 
       for (KuduPredicate pred : predicateSet) {
         scanTokenBuilder.addPredicate(pred);
@@ -172,7 +171,6 @@ public class KuduGroupScan extends AbstractGroupScan {
           }
         }
         kuduWorkList.add(work);
-
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -266,7 +264,7 @@ public class KuduGroupScan extends AbstractGroupScan {
 
     List<KuduSubScanSpec> scanSpecList = Lists.newArrayList();
 
-    logger.info(kuduScanSpec.toString());
+    logger.info("Specific scan: {}", kuduScanSpec.toString());
 
     for (KuduWork work : workList) {
       scanSpecList.add(new KuduSubScanSpec(getTableName(), work.getSerializedScanToken()));
@@ -275,17 +273,15 @@ public class KuduGroupScan extends AbstractGroupScan {
     return new KuduSubScan(storagePlugin, storagePluginConfig, scanSpecList, this.columns);
   }
 
-  // KuduStoragePlugin plugin, KuduStoragePluginConfig config,
-  // List<KuduSubScanSpec> tabletInfoList, List<SchemaPath> columns
   @Override
   public ScanStats getScanStats() {
-    // Very naive - the more constraints the better...
-    //int constraintsDenominator = kuduScanSpec.getPredicates().size() + 1;
+    // Very naive - we just assume the more constraints the better...
     int constraintsDenominator = kuduScanSpecSize(0, kuduScanSpec) + 1;
-    //long recordCount = (100000 / constraintsDenominator) * kuduWorkList.size();
     long recordCount = (100000 / constraintsDenominator);
 
-    return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, recordCount, 1/((float) constraintsDenominator), recordCount);
+    int columnsNominator = AbstractRecordReader.isStarQuery(columns) ? this.getTableSchema().getColumns().size() : this.getColumns().size();
+
+    return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, recordCount, columnsNominator/((float) constraintsDenominator), columnsNominator * recordCount);
   }
 
   private int kuduScanSpecSize(int size, KuduScanSpec cur) {
@@ -349,7 +345,7 @@ public class KuduGroupScan extends AbstractGroupScan {
 
   @JsonIgnore
   public void setFilterPushedDown(boolean b) {
-    this.filterPushedDown = true;
+    this.filterPushedDown = b;
   }
 
   @JsonIgnore

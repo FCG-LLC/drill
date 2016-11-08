@@ -151,7 +151,7 @@ public class KuduRecordWriterImpl extends KuduRecordWriter {
 
   private void flush() throws IOException {
     try {
-      // context.getStats().startWait();
+      context.getStats().startWait();
       List<OperationResponse> responses = session.flush();
       for (OperationResponse response : responses) {
         if (response.hasRowError()) {
@@ -161,7 +161,7 @@ public class KuduRecordWriterImpl extends KuduRecordWriter {
     } catch (Exception e) {
       throw new IOException(e);
     } finally {
-      // context.getStats().stopWait();
+      context.getStats().stopWait();
     }
   }
 

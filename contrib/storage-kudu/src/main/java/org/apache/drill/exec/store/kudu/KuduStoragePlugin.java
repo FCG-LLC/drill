@@ -104,6 +104,5 @@ public class KuduStoragePlugin extends AbstractStoragePlugin {
   @Override
   public Set<StoragePluginOptimizerRule> getPhysicalOptimizerRules(OptimizerRulesContext optimizerRulesContext) {
     return ImmutableSet.of(KuduPushFilterIntoScan.FILTER_ON_SCAN, KuduPushFilterIntoScan.FILTER_ON_PROJECT);
-    //return ImmutableSet.of(KuduPushFilterIntoScan.FILTER_ON_SCAN);
   }
 }

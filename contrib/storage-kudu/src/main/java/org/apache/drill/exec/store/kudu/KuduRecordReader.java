@@ -90,7 +90,6 @@ public class KuduRecordReader extends AbstractRecordReader {
     setColumns(projectedColumns);
     this.client = client;
     scanSpec = subScanSpec;
-    logger.debug("Scan spec: {}", subScanSpec);
   }
 
   @Override
@@ -206,9 +205,6 @@ public class KuduRecordReader extends AbstractRecordReader {
     }
 
     for (ProjectedColumnInfo pci : projectedCols) {
-      if (result.isNull(pci.index)) {
-        continue;
-      }
       switch (pci.kuduColumn.getType()) {
       case BINARY: {
         ByteBuffer value = result.getBinary(pci.index);
@@ -231,7 +227,8 @@ public class KuduRecordReader extends AbstractRecordReader {
           if (result.isNull(pci.index)) {
             ((NullableVarCharVector.Mutator) pci.vv.getMutator()).setNull(pci.index);
           } else {
-            ((NullableVarCharVector.Mutator) pci.vv.getMutator()).set(rowIndex, result.getString(pci.index).getBytes());
+            byte[] strBytes = result.getString(pci.index).getBytes();
+            ((NullableVarCharVector.Mutator) pci.vv.getMutator()).setSafe(rowIndex, strBytes, 0, strBytes.length);
           }
         } else {
           ((VarCharVector.Mutator) pci.vv.getMutator()).setSafe(rowIndex, result.getString(pci.index).getBytes());

@@ -18,9 +18,7 @@ package org.apache.drill.exec.store.kudu;
  * limitations under the License.
  */
 
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Multimap;
 import org.apache.drill.common.expression.BooleanOperator;
 import org.apache.drill.common.expression.FunctionCall;
 import org.apache.drill.common.expression.LogicalExpression;
@@ -28,15 +26,11 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.expression.visitors.AbstractExprVisitor;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Date;
-import java.util.List;
 
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.Type;
-import org.apache.kudu.client.Bytes;
-import org.apache.kudu.client.ColumnRangePredicate;
 import org.apache.kudu.client.KuduPredicate;
 
 public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, RuntimeException> {
@@ -45,10 +39,6 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
     final private Schema tableSchema;
 
     final private LogicalExpression le;
-
-    private boolean allExpressionsConverted = true;
-
-    private static Boolean nullComparatorSupported = null;
 
     KuduFilterBuilder(KuduGroupScan groupScan, LogicalExpression le) {
         this.groupScan = groupScan;
@@ -69,14 +59,12 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
     }
 
     public boolean isAllExpressionsConverted() {
-        // That's very nice optimization, but it will probably never work right here
-        //return allExpressionsConverted;
+        // That would be a very nice optimization, but it will probably never work right here
         return false;
     }
 
     @Override
     public KuduScanSpec visitUnknown(LogicalExpression e, Void value) throws RuntimeException {
-        allExpressionsConverted = false;
         return null;
     }
 
@@ -107,7 +95,6 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                         if (firstScanSpec != null && nextScanSpec != null) {
                             nodeScanSpec = mergeScanSpecs(functionName, firstScanSpec, nextScanSpec);
                         } else {
-                            allExpressionsConverted = false;
                             if ("booleanAnd".equals(functionName)) {
                                 nodeScanSpec = firstScanSpec == null ? nextScanSpec : firstScanSpec;
                             }
@@ -116,10 +103,6 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                     }
                     break;
             }
-        }
-
-        if (nodeScanSpec == null) {
-            allExpressionsConverted = false;
         }
 
         return nodeScanSpec;
@@ -166,25 +149,6 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
         Object originalValue = processor.getOriginalValue();
         boolean sortOrderAscending = processor.isSortOrderAscending();
 
-        // FIXME: isRowKey should tell if a given column is the primary key of the current table
-        boolean isRowKey = false;
-//        if (!(isRowKey
-//                || (!field.getRootSegment().isLastPath()
-//                && field.getRootSegment().getChild().isLastPath()
-//                && field.getRootSegment().getChild().isNamed())
-//        )
-//                ) {
-//      /*
-//       * if the field in this function is neither the row_key nor a qualified column, return.
-//       */
-//            return null;
-//        }
-
-        // FIXME: that's a good idea for Kudu too probably - create partial that would filter by prefix
-//        if (processor.isRowKeyPrefixComparison()) {
-//            return createRowKeyPrefixScanSpec(call, processor);
-//        }
-
 
         String colName = field.getRootSegment().getPath();
         ColumnSchema colSchema = tableSchema.getColumn(colName);
@@ -194,18 +158,10 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
             originalValue = new String(fieldValue);
         }
 
-        boolean isNullTest = false;
-        byte[] startRow = null;
-        byte[] stopRow = null;
-
         KuduPredicate.ComparisonOp op = null;
         switch (functionName) {
             case "equal":
                 op = KuduPredicate.ComparisonOp.EQUAL;
-                if (isRowKey) {
-                    startRow = fieldValue;
-                    stopRow = Arrays.copyOf(fieldValue, fieldValue.length+1);
-                }
                 break;
             case "not_equal":
                 // not supported
@@ -276,8 +232,6 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                 // Not supported - could be supporting prefix search
                 break;
 
-
-
         }
 
         KuduPredicate predicate = new KuduPredicateFactory(colSchema, op).create(originalValue);
@@ -335,23 +289,6 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
 
             return null;
         }
-
     }
-
-//    private HBaseScanSpec createRowKeyPrefixScanSpec(FunctionCall call,
-//                                                     CompareFunctionsProcessor processor) {
-//        byte[] startRow = processor.getRowKeyPrefixStartRow();
-//        byte[] stopRow  = processor.getRowKeyPrefixStopRow();
-//        Filter filter   = processor.getRowKeyPrefixFilter();
-//
-//        if (startRow != HConstants.EMPTY_START_ROW ||
-//                stopRow != HConstants.EMPTY_END_ROW ||
-//                filter != null) {
-//            return new HBaseScanSpec(groupScan.getTableName(), startRow, stopRow, filter);
-//        }
-//
-//        // else
-//        return null;
-//    }
 
 }

@@ -140,6 +140,10 @@ public class KuduSubScan extends AbstractBase implements SubScan {
     public KuduScanner deserializeIntoScanner(KuduClient client) throws IOException {
       return KuduScanToken.deserializeIntoScanner(serializedScanToken, client);
     }
+
+    public String toString(KuduClient client) throws IOException {
+      return String.format("KuduSubScanSpec: {}, {}", getTableName(), KuduScanToken.stringifySerializedToken(serializedScanToken, client));
+    }
   }
 
   @Override

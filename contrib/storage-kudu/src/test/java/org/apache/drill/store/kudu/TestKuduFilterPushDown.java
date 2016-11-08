@@ -1,9 +1,28 @@
 package org.apache.drill.store.kudu;
 
 import org.apache.drill.PlanTestBase;
+import org.junit.Ignore;
 import org.junit.Test;
 
+@Ignore("requires a remote kudu server to run.")
 public class TestKuduFilterPushDown extends BaseKuduTest {
+    
+    @Test
+    public void testColumnSelect() throws Exception {
+        setColumnWidths(new int[] {8, 38, 38});
+        final String sql = "SELECT\n"
+                + "  key1\n"
+                + "FROM\n"
+                + "  [TABLE_NAME]\n";
+
+        runKuduSQLVerifyCount(sql, 5);
+
+        final String[] expectedPlan = {".*columns=\\[`key1`\\].*"};
+        final String[] excludedPlan ={};
+        final String sqlKudu = canonizeKuduSQL(sql);
+        PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
+    }
+
     @Test
     public void testFilterPushDownRowKeyEqual() throws Exception {
         setColumnWidths(new int[] {8, 38, 38});

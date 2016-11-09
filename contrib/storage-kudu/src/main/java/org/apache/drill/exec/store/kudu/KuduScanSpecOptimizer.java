@@ -146,8 +146,9 @@ public class KuduScanSpecOptimizer {
     }
 
     private List<List<KuduPredicate>> permutateScanSpec(List<List<KuduPredicate>> inputPermutationSets, KuduScanSpec scanSpec) {
-        if (scanSpec.getPredicates().isEmpty() && scanSpec.getSubSets().isEmpty())
+        if (scanSpec.getPredicates().isEmpty() && scanSpec.getSubSets().isEmpty()) {
             return inputPermutationSets;
+        }
 
         List<List<KuduPredicate>> newLists = new ArrayList<>();
 

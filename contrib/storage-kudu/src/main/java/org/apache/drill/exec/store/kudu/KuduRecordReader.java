@@ -18,11 +18,10 @@
 package org.apache.drill.exec.store.kudu;
 
 import java.nio.ByteBuffer;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.collect.ImmutableMap;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.SchemaPath;
@@ -57,12 +56,12 @@ import org.apache.drill.exec.vector.VarCharVector;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.Type;
-import org.apache.kudu.client.*;
-import org.apache.kudu.client.KuduScanner.KuduScannerBuilder;
-import org.apache.kudu.client.shaded.com.google.common.collect.ImmutableMap;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduScanner;
+import org.apache.kudu.client.RowResult;
+import org.apache.kudu.client.RowResultIterator;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 
 public class KuduRecordReader extends AbstractRecordReader {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(KuduRecordReader.class);

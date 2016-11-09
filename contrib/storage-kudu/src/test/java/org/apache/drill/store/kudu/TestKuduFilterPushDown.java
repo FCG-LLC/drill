@@ -6,7 +6,6 @@ import org.junit.Test;
 
 @Ignore("requires a remote kudu server to run.")
 public class TestKuduFilterPushDown extends BaseKuduTest {
-    
     @Test
     public void testColumnSelect() throws Exception {
         setColumnWidths(new int[] {8, 38, 38});

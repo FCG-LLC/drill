@@ -2,7 +2,6 @@ package org.apache.drill.store.kudu;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.Files;
-import org.apache.avro.generic.GenericData;
 import org.apache.drill.BaseTestQuery;
 import org.apache.drill.common.util.FileUtils;
 import org.apache.drill.exec.exception.SchemaChangeException;
@@ -13,9 +12,15 @@ import org.apache.drill.exec.store.kudu.KuduStoragePluginConfig;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.Type;
-import org.apache.kudu.client.*;
+import org.apache.kudu.client.CreateTableOptions;
+import org.apache.kudu.client.Insert;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduSession;
+import org.apache.kudu.client.KuduTable;
+import org.apache.kudu.client.ListTablesResponse;
+import org.apache.kudu.client.PartialRow;
+import org.apache.kudu.client.SessionConfiguration;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.BeforeClass;
 
 import java.io.IOException;

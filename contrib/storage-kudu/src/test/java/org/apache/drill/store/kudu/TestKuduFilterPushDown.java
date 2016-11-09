@@ -4,7 +4,7 @@ import org.apache.drill.PlanTestBase;
 import org.junit.Ignore;
 import org.junit.Test;
 
-@Ignore("requires a remote kudu server to run.")
+//@Ignore("requires a remote kudu server to run.")
 public class TestKuduFilterPushDown extends BaseKuduTest {
     @Test
     public void testColumnSelect() throws Exception {
@@ -71,6 +71,24 @@ public class TestKuduFilterPushDown extends BaseKuduTest {
         runKuduSQLVerifyCount(sql, 2);
 
         final String[] expectedPlan = {".*Predicates on table test_foo\\: \\{`key1` >= 1 AND `key2` = \"a\"\\} OR \\{`key1` = 3 AND `key2` = \"b\"\\}.*"};
+        final String[] excludedPlan ={};
+        final String sqlKudu = canonizeKuduSQL(sql);
+        PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
+    }
+
+    @Test
+    public void testFilterPushDownRowKeyMutualOrAndIncludingNonPrimaryKey() throws Exception {
+        setColumnWidths(new int[] {8, 38, 38});
+        final String sql = "SELECT\n"
+                + "  key1\n"
+                + "FROM\n"
+                + "  [TABLE_NAME]\n"
+                + "WHERE\n"
+                + "  (key1 >= 1 AND key2 = 'a' AND str = 'xx') OR (key1 = 3 AND key2 = 'b' AND str = 'uu')";
+
+        runKuduSQLVerifyCount(sql, 2);
+
+        final String[] expectedPlan = {".*Predicates on table test_foo\\: \\{`key1` >= 1 AND `key2` =\\s+\"a\"\\} OR \\{`key1` = 3 AND `key2` = \"b\"\\}.*"};
         final String[] excludedPlan ={};
         final String sqlKudu = canonizeKuduSQL(sql);
         PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);

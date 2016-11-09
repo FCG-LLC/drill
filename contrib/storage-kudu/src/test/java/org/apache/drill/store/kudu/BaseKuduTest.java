@@ -60,7 +60,7 @@ public class BaseKuduTest extends BaseTestQuery {
             columns.add(new ColumnSchema.ColumnSchemaBuilder("key1", Type.INT32).key(true).build());
             columns.add(new ColumnSchema.ColumnSchemaBuilder("key2", Type.STRING).key(true).build());
             columns.add(new ColumnSchema.ColumnSchemaBuilder("key3", Type.INT32).key(true).build());
-            columns.add(new ColumnSchema.ColumnSchemaBuilder("string", Type.STRING).nullable(true).build());
+            columns.add(new ColumnSchema.ColumnSchemaBuilder("str",  Type.STRING).nullable(true).build());
 
             Schema schema = new Schema(columns);
             CreateTableOptions builder = new CreateTableOptions();

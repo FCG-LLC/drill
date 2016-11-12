@@ -18,21 +18,25 @@
 package org.apache.drill.exec.store.kudu;
 
 import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.Common;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduPredicate;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 
 
 public class KuduScanSpecOptimizer {
     private KuduScanSpec input;
     private List<String> primaryKeys;
+    private Schema schema;
 
     public KuduScanSpecOptimizer(KuduScanSpec input, Schema schema) {
         this.input = input;
@@ -41,92 +45,8 @@ public class KuduScanSpecOptimizer {
         for (ColumnSchema columnSchema : schema.getPrimaryKeyColumns()) {
             primaryKeys.add(columnSchema.getName());
         }
-    }
 
-    private Set<String> findGaps(List<KuduPredicate> predicates) {
-        Set<String> leftCols = new HashSet<String>();
-        for (KuduPredicate pred : predicates) {
-            leftCols.add(pred.toPB().getColumn());
-        }
-
-        for (String primaryKey : primaryKeys) {
-            if (leftCols.contains(primaryKey)) {
-                // Good, we have it, so far it's valid, lets move to the next...
-                leftCols.remove(primaryKey);
-            } else {
-                // We have a gap - whatever is left should not be included on any path within an OR query
-                return leftCols;
-            }
-        }
-
-        return leftCols;
-    }
-
-    /**
-     * Rebuilds the scan spec, removing anything that could effect in inefficient OR query
-     * (not having full path throguh primary key columns)
-     * @deprecated  NO, don't use it - clean this up
-     */
-    public KuduScanSpec pruneScanSpec(KuduScanSpec input) {
-        // This is simplistic approach, which makes global view on the predicates and constraints
-        // and doesn't take into account alternative paths to get some results
-        KuduScanSpec prunedScanSpec = input;
-        List<KuduScanSpec> prunedScanSpecs;
-
-        do {
-            List<List<KuduPredicate>> permutationSet = permutateScanSpec(prunedScanSpec);
-
-            Set<String> columnsForbiddenInORPath = new HashSet<>();
-            for (List<KuduPredicate> predicates : permutationSet) {
-                columnsForbiddenInORPath.addAll(findGaps(predicates));
-            }
-
-            // Do the actual pruning
-            prunedScanSpecs = new ArrayList<>();
-            prunedScanSpec = rebuildScanSpec(prunedScanSpec, false, columnsForbiddenInORPath, prunedScanSpecs);
-        } while (!prunedScanSpecs.isEmpty());
-
-        return prunedScanSpec;
-    }
-
-    /**
-     *  We need to check if for leafs following conditions are valid:
-     *    (a) there is no "OR" in the path, or
-     *    (b) there is "OR" in the path and primary items up until the one occurring in OR are included
-     *       i.e. if we have primary key: k1, k2, k3, k4
-     *       following are OK:
-     *         k1 = 2 OR k1 = 3
-     *         k1 = 2 AND (k2 = 'a' OR k2 = 'b')
-     *         k1 = 2 AND (k2 = 'a' OR k2 = 'b') AND k4 = 100
-     *       following are NOT:
-     *         k2 = 'a' OR k2 = 'b'
-     *         k1 = 2 AND (k2 = 'a' OR k3 = 99999)
-     */
-
-    private KuduScanSpec rebuildScanSpec(KuduScanSpec cur, boolean parentIsOnORPath, Set<String> columnsForbiddenInORPath, List<KuduScanSpec> prunedScanSpecs) {
-        boolean isOnORPath = cur.isPushOr() || parentIsOnORPath;
-
-        KuduScanSpec out = new KuduScanSpec(cur.getTableName());
-
-        for (KuduPredicate pred : cur.getPredicates()) {
-            if (isOnORPath && columnsForbiddenInORPath.contains(pred.toPB().getColumn())) {
-                // We skip this one, sorry
-                prunedScanSpecs.add(cur);
-                return out;
-            }
-        }
-
-        out.getPredicates().addAll(cur.getPredicates());
-        out.setPushOr(cur.isPushOr());
-
-        for (KuduScanSpec child : cur.getSubSets()) {
-            KuduScanSpec rebuiltScan = rebuildScanSpec(child, isOnORPath, columnsForbiddenInORPath, prunedScanSpecs);
-            if (!rebuiltScan.isEmpty()) {
-                out.getSubSets().add(rebuiltScan);
-            }
-        }
-
-        return out;
+        this.schema = schema;
     }
 
     /**
@@ -143,13 +63,21 @@ public class KuduScanSpecOptimizer {
      *
      * With all this scan tokens Drill should handle the rest
      */
-    public List<List<KuduPredicate>> permutateScanSpec(KuduScanSpec scanSpec) {
+    public List<List<KuduPredicate>> optimizeScanSpec(KuduScanSpec scanSpec) {
         List<List<KuduPredicate>> inputPermutationSets = new ArrayList<>();
         inputPermutationSets.add(new ArrayList<KuduPredicate>());
 
         List<List<KuduPredicate>> basePermutationSet = permutateScanSpec(inputPermutationSets, scanSpec);
 
-        return new NonPrimaryKeyPermutationPruner(basePermutationSet).pruneNonLinkedKeys();
+        NonPrimaryKeyPermutationPruner pruner = new NonPrimaryKeyPermutationPruner(basePermutationSet);
+        List<List<KuduPredicate>> prunedSet = pruner.pruneNonLinkedKeys();
+
+        if (prunedSet.isEmpty() || (prunedSet.size() == 1 && prunedSet.iterator().next().size() == 0)) {
+            // Give a second chance and try to get anything out of the predicates
+            prunedSet = pruner.findMostSignificantDenominatorPredicate();
+        }
+
+        return prunedSet;
     }
 
     private List<List<KuduPredicate>> permutateScanSpec(List<List<KuduPredicate>> inputPermutationSets, KuduScanSpec scanSpec) {
@@ -207,25 +135,6 @@ public class KuduScanSpecOptimizer {
             this.permutationSet = permutationSet;
         }
 
-        private Set<String> findGaps(List<KuduPredicate> predicates) {
-            Set<String> leftCols = new HashSet<String>();
-            for (KuduPredicate pred : predicates) {
-                leftCols.add(pred.toPB().getColumn());
-            }
-
-            for (String primaryKey : primaryKeys) {
-                if (leftCols.contains(primaryKey)) {
-                    // Good, we have it, so far it's valid, lets move to the next...
-                    leftCols.remove(primaryKey);
-                } else {
-                    // We have a gap - whatever is left should not be included on any path within an OR query
-                    return leftCols;
-                }
-            }
-
-            return leftCols;
-        }
-
         private Set<KuduPredicate> findLinkedPrimaryKeyPart(List<KuduPredicate> permutation) {
             Set<KuduPredicate> linkedPart = new HashSet<>();
 
@@ -254,7 +163,7 @@ public class KuduScanSpecOptimizer {
 
             for (List<KuduPredicate> permutation : permutationSet) {
                 // If KuduPredicate would implement Comparable then TreeSet could have been better a choice
-                Set<KuduPredicate> linkedPrimaryKeyPredicates = new HashSet<>();
+                Set<KuduPredicate> linkedPrimaryKeyPredicates;
                 Set<KuduPredicate> nonLinkedPredicates = new HashSet<>();
 
                 linkedPrimaryKeyPredicates = findLinkedPrimaryKeyPart(permutation);
@@ -297,5 +206,146 @@ public class KuduScanSpecOptimizer {
 
             return prunedPermutations;
         }
+
+        private int predicateColumnPosition(KuduPredicate pred) {
+            return schema.getColumnIndex(pred.toPB().getColumn());
+        }
+
+        private byte[] getPredicateLowerValue(KuduPredicate pred) {
+            Common.ColumnPredicatePB pb = pred.toPB();
+            switch (pb.getPredicateCase()) {
+                case EQUALITY:
+                    return pb.getEquality().getValue().toByteArray();
+                case RANGE:
+                    return pb.getRange().getLower().toByteArray();
+            }
+            return new byte[]{};
+        }
+
+        private byte[] getPredicateUpperValue(KuduPredicate pred) {
+            Common.ColumnPredicatePB pb = pred.toPB();
+            switch (pb.getPredicateCase()) {
+                case EQUALITY:
+                    return pb.getEquality().getValue().toByteArray();
+                case RANGE:
+                    return pb.getRange().getUpper().toByteArray();
+            }
+            return new byte[]{};
+        }
+
+        private int compareBytes(byte[] b1, byte[] b2) {
+            // Very very naive
+            for (int i = 0; i < Math.max(b1.length, b2.length); i++) {
+                if (b1.length == i)
+                    return -1;
+                if (b2.length == i) {
+                    return 1;
+                }
+
+                if (b1[i] != b2[i]) {
+                    return ((int) b1[i])-((int) b2[i]);
+                }
+            }
+
+            return 0;
+        }
+
+        /**
+         * In case everything was pruned, see if we can still come with
+         * a reasonable scan without including first few primary key elements
+         */
+        public List<List<KuduPredicate>> findMostSignificantDenominatorPredicate() {
+            // Iteration one - sort the predicates within each set
+            for (List<KuduPredicate> permutation : permutationSet) {
+                Collections.sort(permutation, new Comparator<KuduPredicate>() {
+                    @Override
+                    public int compare(KuduPredicate o1, KuduPredicate o2) {
+                        int pos1 = predicateColumnPosition(o1);
+                        int pos2 = predicateColumnPosition(o2);
+
+                        // Simple
+                        if (pos1 != pos2) {
+                            return pos1 - pos2;
+                        }
+
+                        // Not so simple
+                        byte[] str1Lower = getPredicateLowerValue(o1);
+                        byte[] str1Upper = getPredicateUpperValue(o1);
+                        byte[] str2Lower = getPredicateLowerValue(o2);
+                        byte[] str2Upper = getPredicateUpperValue(o2);
+
+                        // Very naive
+                        if (Arrays.equals(str1Lower, str2Lower)) {
+                            if (Arrays.equals(str1Upper, str2Upper)) {
+                                return 0;
+                            } else {
+                                return compareBytes(str1Upper, str2Upper);
+                            }
+                        } else {
+                            return compareBytes(str1Lower, str2Lower);
+                        }
+                    }
+                });
+            }
+
+            // Iteration two - check how far can we gat away with single permutation
+            List<KuduPredicate> singlePermutation = new ArrayList<>();
+
+            int indexPosition = 0;
+
+            do {
+                KuduPredicate candidate = null;
+
+                for (List<KuduPredicate> permutation : permutationSet) {
+                    if (permutation.size() <= indexPosition) {
+                        // This set is too long already - finish
+                        return Arrays.asList(singlePermutation);
+                    }
+
+                    KuduPredicate pred = permutation.get(indexPosition);
+
+                    if (candidate == null) {
+                        candidate = pred;
+                    } else {
+                        if (!candidate.equals(pred)) {
+                            // This is the base we came with
+                            return Arrays.asList(singlePermutation);
+                        }
+                    }
+                }
+
+                // Still here? Great!
+                if (candidate != null) {
+                    singlePermutation.add(candidate);
+                }
+
+                ++indexPosition;
+            } while(true);
+        }
     }
+
+
+    /**
+     * Rebuilds (or fattens) the scan basing on permutation sets.
+     * The scan is now essentially a set of permutations, where each permutation is a collection of AND-bound queries
+     * and the OR of them is being taken into the output
+     */
+    public KuduScanSpec rebuildScanSpec(List<List<KuduPredicate>> permutationSet) {
+        KuduScanSpec spec = new KuduScanSpec(input.getTableName());
+
+        if (permutationSet.size() == 1) {
+            // Just to keep things clear, lets not put it deeper unnecessarily
+            spec.getPredicates().addAll(permutationSet.iterator().next());
+        } else {
+            for (List<KuduPredicate> permutation : permutationSet) {
+                KuduScanSpec subScan = new KuduScanSpec(input.getTableName());
+                subScan.getPredicates().addAll(permutation);
+                spec.addSubSet(subScan);
+            }
+            spec.setPushOr(true);
+        }
+
+        return spec;
+    }
+
 }

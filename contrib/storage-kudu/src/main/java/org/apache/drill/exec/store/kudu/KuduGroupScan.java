@@ -104,9 +104,8 @@ public class KuduGroupScan extends AbstractGroupScan {
     KuduScanSpecOptimizer scanSpecOptimizer = new KuduScanSpecOptimizer(kuduScanSpec, tableSchema);
 
     // We want to get rid of items that would be inefficient in the scan
-    kuduScanSpec = scanSpecOptimizer.pruneScanSpec(kuduScanSpec);
-
-    List<List<KuduPredicate>> predicatePermutationSets = scanSpecOptimizer.permutateScanSpec(kuduScanSpec);
+    List<List<KuduPredicate>> predicatePermutationSets = scanSpecOptimizer.optimizeScanSpec(kuduScanSpec);
+    kuduScanSpec = scanSpecOptimizer.rebuildScanSpec(predicatePermutationSets);
 
     for (List<KuduPredicate> predicateSet : predicatePermutationSets) {
       KuduScanToken.KuduScanTokenBuilder scanTokenBuilder = client.newScanTokenBuilder(table);

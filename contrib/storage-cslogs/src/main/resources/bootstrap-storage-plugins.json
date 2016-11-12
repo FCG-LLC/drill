@@ -1,0 +1,10 @@
+{
+  "storage":{
+    cslogs : {
+      type:"cslogs",
+      masterAddresses: "127.0.0.1",
+      operationTimeoutMs: 600000,
+      enabled: false
+    }
+  }
+}

@@ -1,0 +1,341 @@
+package org.apache.drill.exec.store.cslogs;
+
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
+
+import com.google.common.collect.ImmutableMap;
+import org.apache.drill.common.exceptions.ExecutionSetupException;
+import org.apache.drill.common.exceptions.UserException;
+import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.common.types.TypeProtos.MajorType;
+import org.apache.drill.common.types.TypeProtos.MinorType;
+import org.apache.drill.common.types.Types;
+import org.apache.drill.exec.exception.SchemaChangeException;
+import org.apache.drill.exec.expr.TypeHelper;
+import org.apache.drill.exec.ops.FragmentContext;
+import org.apache.drill.exec.ops.OperatorContext;
+import org.apache.drill.exec.physical.impl.OutputMutator;
+import org.apache.drill.exec.record.MaterializedField;
+import org.apache.drill.exec.store.AbstractRecordReader;
+import org.apache.drill.exec.vector.BigIntVector;
+import org.apache.drill.exec.vector.BitVector;
+import org.apache.drill.exec.vector.Float4Vector;
+import org.apache.drill.exec.vector.Float8Vector;
+import org.apache.drill.exec.vector.IntVector;
+import org.apache.drill.exec.vector.NullableBigIntVector;
+import org.apache.drill.exec.vector.NullableBitVector;
+import org.apache.drill.exec.vector.NullableFloat4Vector;
+import org.apache.drill.exec.vector.NullableFloat8Vector;
+import org.apache.drill.exec.vector.NullableIntVector;
+import org.apache.drill.exec.vector.NullableTimeStampVector;
+import org.apache.drill.exec.vector.NullableVarBinaryVector;
+import org.apache.drill.exec.vector.NullableVarCharVector;
+import org.apache.drill.exec.vector.TimeStampVector;
+import org.apache.drill.exec.vector.ValueVector;
+import org.apache.drill.exec.vector.VarBinaryVector;
+import org.apache.drill.exec.vector.VarCharVector;
+import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.Schema;
+import org.apache.kudu.Type;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduScanner;
+import org.apache.kudu.client.RowResult;
+import org.apache.kudu.client.RowResultIterator;
+
+import com.google.common.collect.ImmutableList;
+
+public class CSLogsRecordReader extends AbstractRecordReader {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(CSLogsRecordReader.class);
+
+    private static final int TARGET_RECORD_COUNT = 4000;
+
+    private final KuduClient client;
+    private final CSLogsSubScan.CSLogsSubScanSpec scanSpec;
+    private KuduScanner scanner;
+    private RowResultIterator iterator;
+
+    private OutputMutator output;
+    private OperatorContext context;
+
+    private static class ProjectedColumnInfo {
+        int index;
+        ValueVector vv;
+        ColumnSchema kuduColumn;
+    }
+
+    private ImmutableList<ProjectedColumnInfo> projectedCols;
+
+    public CSLogsRecordReader(KuduClient client, CSLogsSubScan.CSLogsSubScanSpec subScanSpec,
+                            List<SchemaPath> projectedColumns, FragmentContext context) {
+        setColumns(projectedColumns);
+        this.client = client;
+        scanSpec = subScanSpec;
+    }
+
+    @Override
+    public void setup(OperatorContext context, OutputMutator output) throws ExecutionSetupException {
+        this.output = output;
+        this.context = context;
+        try {
+            context.getStats().startWait();
+
+            try {
+                scanner = scanSpec.deserializeIntoScanner(client);
+            } finally {
+                context.getStats().stopWait();
+            }
+
+        } catch (Exception e) {
+            throw new ExecutionSetupException(e);
+        }
+    }
+
+    static final Map<Type, MinorType> TYPES;
+
+    static {
+        TYPES = ImmutableMap.<Type, MinorType> builder()
+                .put(Type.BINARY, MinorType.VARBINARY)
+                .put(Type.BOOL, MinorType.BIT)
+                .put(Type.DOUBLE, MinorType.FLOAT8)
+                .put(Type.FLOAT, MinorType.FLOAT4)
+                .put(Type.INT8, MinorType.INT)
+                .put(Type.INT16, MinorType.INT)
+                .put(Type.INT32, MinorType.INT)
+                .put(Type.INT64, MinorType.BIGINT)
+                .put(Type.STRING, MinorType.VARCHAR)
+                .put(Type.UNIXTIME_MICROS, MinorType.TIMESTAMP)
+                .build();
+    }
+
+    @Override
+    public int next() {
+        int rowCount = 0;
+        try {
+            while (iterator == null || !iterator.hasNext()) {
+                if (!scanner.hasMoreRows()) {
+                    iterator = null;
+                    return 0;
+                }
+                context.getStats().startWait();
+                try {
+                    iterator = scanner.nextRows();
+                } finally {
+                    context.getStats().stopWait();
+                }
+            }
+            for (; rowCount < TARGET_RECORD_COUNT && iterator.hasNext(); rowCount++) {
+                addRowResult(iterator.next(), rowCount);
+            }
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+        for (ProjectedColumnInfo pci : projectedCols) {
+            pci.vv.getMutator().setValueCount(rowCount);
+        }
+        return rowCount;
+    }
+
+    private void initCols(Schema schema) throws SchemaChangeException {
+        ImmutableList.Builder<ProjectedColumnInfo> pciBuilder = ImmutableList.builder();
+
+        for (int i = 0; i < schema.getColumnCount(); i++) {
+            ColumnSchema col = schema.getColumnByIndex(i);
+
+            final String name = col.getName();
+            final Type kuduType = col.getType();
+            MinorType minorType = TYPES.get(kuduType);
+            if (minorType == null) {
+                logger.warn("Ignoring column that is unsupported.", UserException
+                        .unsupportedError()
+                        .message(
+                                "A column you queried has a data type that is not currently supported by the Kudu storage plugin. "
+                                        + "The column's name was %s and its Kudu data type was %s. ",
+                                name, kuduType.toString())
+                        .addContext("column Name", name)
+                        .addContext("plugin", "kudu")
+                        .build(logger));
+
+                continue;
+            }
+            MajorType majorType;
+            if (col.isNullable()) {
+                majorType = Types.optional(minorType);
+            } else {
+                majorType = Types.required(minorType);
+            }
+            MaterializedField field = MaterializedField.create(name, majorType);
+            final Class<? extends ValueVector> clazz = (Class<? extends ValueVector>) TypeHelper.getValueVectorClass(
+                    minorType, majorType.getMode());
+            ValueVector vector = output.addField(field, clazz);
+            vector.allocateNew();
+
+            ProjectedColumnInfo pci = new ProjectedColumnInfo();
+            pci.vv = vector;
+            pci.kuduColumn = col;
+            pci.index = i;
+            pciBuilder.add(pci);
+        }
+
+        projectedCols = pciBuilder.build();
+    }
+
+    private void addRowResult(RowResult result, int rowIndex) throws SchemaChangeException {
+        if (projectedCols == null) {
+            initCols(result.getColumnProjection());
+        }
+
+        for (ProjectedColumnInfo pci : projectedCols) {
+            switch (pci.kuduColumn.getType()) {
+                case BINARY: {
+                    ByteBuffer value = result.getBinary(pci.index);
+                    if (pci.kuduColumn.isNullable()) {
+                        if (result.isNull(pci.index)) {
+                            ((NullableVarBinaryVector.Mutator) pci.vv.getMutator())
+                                    .setNull(rowIndex);
+                        } else {
+                            ((NullableVarBinaryVector.Mutator) pci.vv.getMutator())
+                                    .setSafe(rowIndex, value, 0, value.remaining());
+                        }
+                    } else {
+                        ((VarBinaryVector.Mutator) pci.vv.getMutator())
+                                .setSafe(rowIndex, value, 0, value.remaining());
+                    }
+                    break;
+                }
+                case STRING: {
+                    if (pci.kuduColumn.isNullable()) {
+                        if (result.isNull(pci.index)) {
+                            ((NullableVarCharVector.Mutator) pci.vv.getMutator()).setNull(pci.index);
+                        } else {
+                            byte[] strBytes = result.getString(pci.index).getBytes();
+                            ((NullableVarCharVector.Mutator) pci.vv.getMutator()).setSafe(rowIndex, strBytes, 0, strBytes.length);
+                        }
+                    } else {
+                        ((VarCharVector.Mutator) pci.vv.getMutator()).setSafe(rowIndex, result.getString(pci.index).getBytes());
+                    }
+                    break;
+                }
+                case BOOL:
+                    if (pci.kuduColumn.isNullable()) {
+                        if (result.isNull(pci.index)) {
+                            ((NullableBitVector.Mutator) pci.vv.getMutator())
+                                    .setNull(rowIndex);
+                        } else {
+                            ((NullableBitVector.Mutator) pci.vv.getMutator())
+                                    .setSafe(rowIndex, result.getBoolean(pci.index) ? 1 : 0);
+                        }
+                    } else {
+                        ((BitVector.Mutator) pci.vv.getMutator())
+                                .setSafe(rowIndex, result.getBoolean(pci.index) ? 1 : 0);
+                    }
+                    break;
+                case DOUBLE:
+                    if (pci.kuduColumn.isNullable()) {
+                        if (result.isNull(pci.index)) {
+                            ((NullableFloat8Vector.Mutator) pci.vv.getMutator())
+                                    .setNull(rowIndex);
+                        } else {
+                            ((NullableFloat8Vector.Mutator) pci.vv.getMutator())
+                                    .setSafe(rowIndex, result.getDouble(pci.index));
+                        }
+                    } else {
+                        ((Float8Vector.Mutator) pci.vv.getMutator())
+                                .setSafe(rowIndex, result.getDouble(pci.index));
+                    }
+                    break;
+                case FLOAT:
+                    if (pci.kuduColumn.isNullable()) {
+                        if (result.isNull(pci.index)) {
+                            ((NullableFloat4Vector.Mutator) pci.vv.getMutator())
+                                    .setNull(rowIndex);
+                        } else {
+                            ((NullableFloat4Vector.Mutator) pci.vv.getMutator())
+                                    .setSafe(rowIndex, result.getFloat(pci.index));
+                        }
+                    } else {
+                        ((Float4Vector.Mutator) pci.vv.getMutator())
+                                .setSafe(rowIndex, result.getFloat(pci.index));
+                    }
+                    break;
+                case INT16:
+                    if (pci.kuduColumn.isNullable()) {
+                        if (result.isNull(pci.index)) {
+                            ((NullableIntVector.Mutator) pci.vv.getMutator())
+                                    .setNull(rowIndex);
+                        } else {
+                            ((NullableIntVector.Mutator) pci.vv.getMutator())
+                                    .setSafe(rowIndex, result.getShort(pci.index));
+                        }
+                    } else {
+                        ((IntVector.Mutator) pci.vv.getMutator())
+                                .setSafe(rowIndex, result.getShort(pci.index));
+                    }
+                    break;
+                case INT32:
+                    if (pci.kuduColumn.isNullable()) {
+                        if (result.isNull(pci.index)) {
+                            ((NullableIntVector.Mutator) pci.vv.getMutator())
+                                    .setNull(rowIndex);
+                        } else {
+                            ((NullableIntVector.Mutator) pci.vv.getMutator())
+                                    .setSafe(rowIndex, result.getInt(pci.index));
+                        }
+                    } else {
+                        ((IntVector.Mutator) pci.vv.getMutator())
+                                .setSafe(rowIndex, result.getInt(pci.index));
+                    }
+                    break;
+                case INT8:
+                    if (pci.kuduColumn.isNullable()) {
+                        if (result.isNull(pci.index)) {
+                            ((NullableIntVector.Mutator) pci.vv.getMutator())
+                                    .setNull(rowIndex);
+                        } else {
+                            ((NullableIntVector.Mutator) pci.vv.getMutator())
+                                    .setSafe(rowIndex, result.getByte(pci.index));
+                        }
+                    } else {
+                        ((IntVector.Mutator) pci.vv.getMutator())
+                                .setSafe(rowIndex, result.getByte(pci.index));
+                    }
+                    break;
+                case INT64:
+                    if (pci.kuduColumn.isNullable()) {
+                        if (result.isNull(pci.index)) {
+                            ((NullableBigIntVector.Mutator) pci.vv.getMutator())
+                                    .setNull(rowIndex);
+                        } else {
+                            ((NullableBigIntVector.Mutator) pci.vv.getMutator())
+                                    .setSafe(rowIndex, result.getLong(pci.index));
+                        }
+                    } else {
+                        ((BigIntVector.Mutator) pci.vv.getMutator())
+                                .setSafe(rowIndex, result.getLong(pci.index));
+                    }
+                    break;
+                case UNIXTIME_MICROS:
+                    if (pci.kuduColumn.isNullable()) {
+                        if (result.isNull(pci.index)) {
+                            ((NullableTimeStampVector.Mutator) pci.vv.getMutator())
+                                    .setNull(rowIndex);
+                        } else {
+                            ((NullableTimeStampVector.Mutator) pci.vv.getMutator())
+                                    .setSafe(rowIndex, result.getLong(pci.index) / 1000);
+                        }
+                    } else {
+                        ((TimeStampVector.Mutator) pci.vv.getMutator())
+                                .setSafe(rowIndex, result.getLong(pci.index) / 1000);
+                    }
+                    break;
+                default:
+                    throw new SchemaChangeException("unknown type"); // TODO make better
+            }
+        }
+    }
+
+    @Override
+    public void close() {
+    }
+
+}

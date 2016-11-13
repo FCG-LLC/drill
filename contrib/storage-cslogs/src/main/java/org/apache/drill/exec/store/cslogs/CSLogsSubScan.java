@@ -99,30 +99,36 @@ public class CSLogsSubScan extends AbstractBase implements SubScan {
 
     public static class CSLogsSubScanSpec {
 
-        private final String tableName;
-        private final byte[] serializedScanToken;
+        private final byte[] serializedInvertedIndexToken;
+        private final byte[] serializedLogToken;
 
         @JsonCreator
-        public CSLogsSubScanSpec(@JsonProperty("tableName") String tableName,
-                               @JsonProperty("startKey") byte[] serializedScanToken) {
-            this.tableName = tableName;
-            this.serializedScanToken = serializedScanToken;
+        public CSLogsSubScanSpec(
+                @JsonProperty("invertedIndexToken") byte[] serializedInvertedIndexToken,
+                @JsonProperty("serializedLogToken") byte[] serializedLogToken
+        ) {
+            this.serializedInvertedIndexToken = serializedInvertedIndexToken;
+            this.serializedLogToken = serializedLogToken;
         }
 
-        public String getTableName() {
-            return tableName;
+        public byte[] getSerializedInvertedIndexToken() {
+            return serializedInvertedIndexToken;
         }
 
-        public byte[] getSerializedScanToken() {
-            return serializedScanToken;
+        public byte[] getSerializedLogToken() {
+            return serializedLogToken;
         }
 
-        public KuduScanner deserializeIntoScanner(KuduClient client) throws IOException {
-            return KuduScanToken.deserializeIntoScanner(serializedScanToken, client);
+        public KuduScanner deserializeIntoInvertedIndexScanner(KuduClient client) throws IOException {
+            return KuduScanToken.deserializeIntoScanner(serializedInvertedIndexToken, client);
+        }
+
+        public KuduScanner deserializeIntoLogScanner(KuduClient client) throws IOException {
+            return KuduScanToken.deserializeIntoScanner(serializedLogToken, client);
         }
 
         public String toString(KuduClient client) throws IOException {
-            return String.format("KuduSubScanSpec: {}, {}", getTableName(), KuduScanToken.stringifySerializedToken(serializedScanToken, client));
+            return String.format("CSLogsSubScanSpec: {} / {} ", KuduScanToken.stringifySerializedToken(getSerializedInvertedIndexToken(), client), KuduScanToken.stringifySerializedToken(getSerializedLogToken(), client));
         }
     }
 

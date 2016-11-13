@@ -156,11 +156,15 @@ public class BaseCSLogsTest extends BaseTestQuery {
     private static void createLogsTable(KuduClient client) throws Exception {
         List<ColumnSchema> columns = new ArrayList<>();
         columns.add(new ColumnSchema.ColumnSchemaBuilder("time_stamp_bucket", Type.INT32).key(true).build());
-        columns.add(new ColumnSchema.ColumnSchemaBuilder("uuid", Type.INT64).key(true).build());
         columns.add(new ColumnSchema.ColumnSchemaBuilder("pattern_id", Type.INT32).key(true).build());
-        columns.add(new ColumnSchema.ColumnSchemaBuilder("server_ip1", Type.INT64).key(true).build());
-        columns.add(new ColumnSchema.ColumnSchemaBuilder("server_ip2", Type.INT64).key(true).build());
-        columns.add(new ColumnSchema.ColumnSchemaBuilder("time_stamp_remainder_ms",  Type.INT32).key(true).build());
+        columns.add(new ColumnSchema.ColumnSchemaBuilder("uuid", Type.INT64).key(true).build());
+        columns.add(new ColumnSchema.ColumnSchemaBuilder("server_ip1", Type.INT64).key(false).build());
+        columns.add(new ColumnSchema.ColumnSchemaBuilder("server_ip2", Type.INT64).key(false).build());
+        columns.add(new ColumnSchema.ColumnSchemaBuilder("time_stamp_remainder_ms",  Type.INT32).key(false).build());
+
+        for (int i = 0; i < 128; i++) {
+            columns.add(new ColumnSchema.ColumnSchemaBuilder("param_"+i, Type.STRING).nullable(true).key(false).build());
+        }
 
         KuduTable logsTable = recreateTable(client, "logs", columns, Arrays.asList("time_stamp_bucket"));
 
@@ -174,11 +178,16 @@ public class BaseCSLogsTest extends BaseTestQuery {
             PartialRow row = insert.getRow();
 
             row.addInt(0, triple[0]);
-            row.addLong(1, triple[2]);
-            row.addInt(2, triple[1]);
+            row.addInt(1, triple[1]);
+            row.addLong(2, triple[2]);
             row.addLong(3, i);
             row.addLong(4, i);
             row.addInt(5, i*1000000);
+
+            for (int j = 0; j < SAMPLE_LOG_PARAMS[i].length; j++) {
+                row.addString(6+j, SAMPLE_LOG_PARAMS[i][j]);
+            }
+
             session.apply(insert);
         }
     }

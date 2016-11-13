@@ -1,8 +1,10 @@
 package org.apache.drill.exec.store.cslogs;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
@@ -39,6 +41,7 @@ import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.Type;
 import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduException;
 import org.apache.kudu.client.KuduScanner;
 import org.apache.kudu.client.RowResult;
 import org.apache.kudu.client.RowResultIterator;
@@ -52,8 +55,10 @@ public class CSLogsRecordReader extends AbstractRecordReader {
 
     private final KuduClient client;
     private final CSLogsSubScan.CSLogsSubScanSpec scanSpec;
-    private KuduScanner scanner;
+    private KuduScanner invertedIndexScanner;
+    private KuduScanner logScanner;
     private RowResultIterator iterator;
+    private LogKeyHolder keyHolder = new LogKeyHolder();
 
     private OutputMutator output;
     private OperatorContext context;
@@ -81,13 +86,53 @@ public class CSLogsRecordReader extends AbstractRecordReader {
             context.getStats().startWait();
 
             try {
-                scanner = scanSpec.deserializeIntoScanner(client);
+                invertedIndexScanner = scanSpec.deserializeIntoInvertedIndexScanner(client);
+                logScanner = scanSpec.deserializeIntoLogScanner(client);
+
+                synchronousPhase1();
             } finally {
                 context.getStats().stopWait();
             }
 
+
         } catch (Exception e) {
             throw new ExecutionSetupException(e);
+        }
+    }
+
+    private class LogKeyHolder {
+        private final TreeMap<Integer, TreeMap<Integer, List<Long>>> theMap = new TreeMap<>();
+
+        public void put(int patternId, int timeStampBucket, long uuid) {
+            TreeMap<Integer, List<Long>> mm = theMap.get(timeStampBucket);
+            if (mm == null) {
+                mm = new TreeMap<>();
+                theMap.put(timeStampBucket, mm);
+            }
+            List<Long> uuids = mm.get(patternId);
+            if (uuids == null) {
+                uuids = new ArrayList<>();
+                mm.put(patternId, uuids);
+            }
+            uuids.add(uuid);
+        }
+
+        public boolean isEmpty() {
+            return theMap.isEmpty();
+        }
+    }
+
+    private void synchronousPhase1() throws KuduException {
+        while (invertedIndexScanner.hasMoreRows()) {
+            RowResultIterator iterator =  invertedIndexScanner.nextRows();
+
+            for (RowResult rowResult : iterator) {
+                int patternId = rowResult.getInt(1);
+                int timeStampBucket = rowResult.getInt(3);
+                long uuid = rowResult.getLong(4);
+
+                keyHolder.put(patternId, timeStampBucket, uuid);
+            }
         }
     }
 
@@ -111,25 +156,33 @@ public class CSLogsRecordReader extends AbstractRecordReader {
     @Override
     public int next() {
         int rowCount = 0;
+
+        if (keyHolder.isEmpty()) {
+            return rowCount;
+        }
+
         try {
             while (iterator == null || !iterator.hasNext()) {
-                if (!scanner.hasMoreRows()) {
+                if (!logScanner.hasMoreRows()) {
                     iterator = null;
                     return 0;
                 }
                 context.getStats().startWait();
                 try {
-                    iterator = scanner.nextRows();
+                    iterator = logScanner.nextRows();
                 } finally {
                     context.getStats().stopWait();
                 }
             }
-            for (; rowCount < TARGET_RECORD_COUNT && iterator.hasNext(); rowCount++) {
+
+            for (; iterator.hasNext(); rowCount++) {
+                // Filter basing on the uuid, or not
                 addRowResult(iterator.next(), rowCount);
             }
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
+
         for (ProjectedColumnInfo pci : projectedCols) {
             pci.vv.getMutator().setValueCount(rowCount);
         }

@@ -66,7 +66,7 @@ import com.google.common.collect.ImmutableList;
 public class KuduRecordReader extends AbstractRecordReader {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(KuduRecordReader.class);
 
-  private static final int TARGET_RECORD_COUNT = 4000;
+//  private static final int TARGET_RECORD_COUNT = 4000;
 
   private final KuduClient client;
   private final KuduSubScanSpec scanSpec;
@@ -142,7 +142,8 @@ public class KuduRecordReader extends AbstractRecordReader {
           context.getStats().stopWait();
         }
       }
-      for (; rowCount < TARGET_RECORD_COUNT && iterator.hasNext(); rowCount++) {
+      for (; iterator.hasNext(); rowCount++) {
+//      for (; rowCount < TARGET_RECORD_COUNT && iterator.hasNext(); rowCount++) {
         addRowResult(iterator.next(), rowCount);
       }
     } catch (Exception ex) {

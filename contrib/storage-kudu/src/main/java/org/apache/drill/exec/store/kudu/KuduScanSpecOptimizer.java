@@ -38,7 +38,9 @@ public class KuduScanSpecOptimizer {
     private List<String> primaryKeys;
     private Schema schema;
 
-    public KuduScanSpecOptimizer(KuduScanSpec input, Schema schema) {
+    private int maxNonPrimaryKeyAlternatives;
+
+    public KuduScanSpecOptimizer(KuduStoragePluginConfig config, KuduScanSpec input, Schema schema) {
         this.input = input;
 
         primaryKeys = new ArrayList<>();
@@ -46,6 +48,7 @@ public class KuduScanSpecOptimizer {
             primaryKeys.add(columnSchema.getName());
         }
 
+        this.maxNonPrimaryKeyAlternatives = config.getOptimizerMaxNonPrimaryKeyAlternatives();
         this.schema = schema;
     }
 
@@ -129,8 +132,6 @@ public class KuduScanSpecOptimizer {
     private class NonPrimaryKeyPermutationPruner {
         private List<List<KuduPredicate>> permutationSet;
 
-        public final static int MAX_NON_PRIMARY_KEY_ALTERNATIVES = 1;
-
         NonPrimaryKeyPermutationPruner(List<List<KuduPredicate>> permutationSet) {
             this.permutationSet = permutationSet;
         }
@@ -190,7 +191,7 @@ public class KuduScanSpecOptimizer {
             // For any permutation of concern, see how many filters are there
             for (Set<KuduPredicate> linkedKeyPart : linkedPrimaryKeyPartToRest.keySet()) {
                 List<Set<KuduPredicate>> nonLinkedKeySets = linkedPrimaryKeyPartToRest.get(linkedKeyPart);
-                if (nonLinkedKeySets.size() > MAX_NON_PRIMARY_KEY_ALTERNATIVES) {
+                if (nonLinkedKeySets.size() > maxNonPrimaryKeyAlternatives) {
                     // Skip the permutations
                     prunedPermutations.add(new ArrayList<>(linkedKeyPart));
                 } else {
@@ -236,8 +237,9 @@ public class KuduScanSpecOptimizer {
         private int compareBytes(byte[] b1, byte[] b2) {
             // Very very naive
             for (int i = 0; i < Math.max(b1.length, b2.length); i++) {
-                if (b1.length == i)
+                if (b1.length == i) {
                     return -1;
+                }
                 if (b2.length == i) {
                     return 1;
                 }

@@ -31,11 +31,16 @@ public class KuduStoragePluginConfig extends StoragePluginConfigBase {
 
   private final String masterAddresses;
   private final long operationTimeoutMs;
+  private final int optimizerMaxNonPrimaryKeyAlternatives;
 
   @JsonCreator
-  public KuduStoragePluginConfig(@JsonProperty("masterAddresses") String masterAddresses, @JsonProperty("operationTimeoutMs") long operationTimoutMs) {
+  public KuduStoragePluginConfig(
+          @JsonProperty("masterAddresses") String masterAddresses,
+          @JsonProperty("operationTimeoutMs") long operationTimoutMs,
+          @JsonProperty("optimizerMaxNonPrimaryKeyAlternatives") int optimizerMaxNonPrimaryKeyAlternatives) {
     this.masterAddresses = masterAddresses;
     this.operationTimeoutMs = operationTimoutMs;
+    this.optimizerMaxNonPrimaryKeyAlternatives = optimizerMaxNonPrimaryKeyAlternatives;
   }
 
   public String getMasterAddresses() {
@@ -44,10 +49,13 @@ public class KuduStoragePluginConfig extends StoragePluginConfigBase {
 
   public long getOperationTimeoutMs() { return operationTimeoutMs; }
 
+  public int getOptimizerMaxNonPrimaryKeyAlternatives() { return optimizerMaxNonPrimaryKeyAlternatives; }
+
   @Override
   public int hashCode() {
     int result = masterAddresses.hashCode();
     result = 31 * result + (int) (operationTimeoutMs ^ (operationTimeoutMs >>> 32));
+    result = 31 * result + optimizerMaxNonPrimaryKeyAlternatives;
     return result;
   }
 
@@ -64,6 +72,10 @@ public class KuduStoragePluginConfig extends StoragePluginConfigBase {
     KuduStoragePluginConfig that = (KuduStoragePluginConfig) o;
 
     if (operationTimeoutMs != that.operationTimeoutMs) {
+      return false;
+    }
+
+    if (optimizerMaxNonPrimaryKeyAlternatives != that.optimizerMaxNonPrimaryKeyAlternatives) {
       return false;
     }
 

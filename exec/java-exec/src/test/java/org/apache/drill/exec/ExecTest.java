@@ -21,7 +21,13 @@ import com.codahale.metrics.MetricRegistry;
 import com.google.common.io.Files;
 import mockit.NonStrictExpectations;
 import org.apache.commons.io.FileUtils;
+import org.antlr.runtime.ANTLRStringStream;
+import org.antlr.runtime.CommonTokenStream;
+import org.antlr.runtime.RecognitionException;
 import org.apache.drill.common.config.DrillConfig;
+import org.apache.drill.common.expression.LogicalExpression;
+import org.apache.drill.common.expression.parser.ExprLexer;
+import org.apache.drill.common.expression.parser.ExprParser;
 import org.apache.drill.common.scanner.ClassPathScanner;
 import org.apache.drill.exec.compile.CodeCompilerTestFactory;
 import org.apache.drill.exec.memory.RootAllocatorFactory;
@@ -31,6 +37,7 @@ import org.apache.drill.exec.planner.PhysicalPlanReaderTestFactory;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.server.options.SystemOptionManager;
 import org.apache.drill.exec.store.sys.store.provider.LocalPersistentStoreProvider;
+import org.apache.drill.exec.util.GuavaPatcher;
 import org.apache.drill.test.DrillTest;
 import org.junit.After;
 import org.junit.BeforeClass;
@@ -41,6 +48,10 @@ import java.io.File;
 public class ExecTest extends DrillTest {
 
   protected static SystemOptionManager optionManager;
+  static {
+    GuavaPatcher.patch();
+  }
+
   private static final DrillConfig c = DrillConfig.create();
 
   @After
@@ -84,6 +95,14 @@ public class ExecTest extends DrillTest {
       bitContext.getOptionManager(); result = optionManager;
       bitContext.getCompiler(); result = CodeCompilerTestFactory.getTestCompiler(c);
     }};
+  }
+
+  protected LogicalExpression parseExpr(String expr) throws RecognitionException {
+    final ExprLexer lexer = new ExprLexer(new ANTLRStringStream(expr));
+    final CommonTokenStream tokens = new CommonTokenStream(lexer);
+    final ExprParser parser = new ExprParser(tokens);
+    final ExprParser.parse_return ret = parser.parse();
+    return ret.e;
   }
 
 }

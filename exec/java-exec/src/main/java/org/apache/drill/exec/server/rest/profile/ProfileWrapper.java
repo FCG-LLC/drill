@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Maps;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.drill.exec.proto.UserBitShared.CoreOperatorType;
 import org.apache.drill.exec.proto.UserBitShared.MajorFragmentProfile;
@@ -30,17 +32,23 @@ import org.apache.drill.exec.proto.UserBitShared.MinorFragmentProfile;
 import org.apache.drill.exec.proto.UserBitShared.OperatorProfile;
 import org.apache.drill.exec.proto.UserBitShared.QueryProfile;
 import org.apache.drill.exec.proto.helper.QueryIdHelper;
+import org.apache.drill.exec.server.options.OptionList;
+import org.apache.drill.exec.server.options.OptionValue;
+
+import static com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT;
 
 /**
  * Wrapper class for a {@link #profile query profile}, so it to be presented through web UI.
  */
 public class ProfileWrapper {
-//  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ProfileWrapper.class);
+  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ProfileWrapper.class);
+  private static final ObjectMapper mapper = new ObjectMapper().enable(INDENT_OUTPUT);
 
   private QueryProfile profile;
   private String id;
   private final List<FragmentWrapper> fragmentProfiles;
   private final List<OperatorWrapper> operatorProfiles;
+  private OptionList options;
 
   public ProfileWrapper(final QueryProfile profile) {
     this.profile = profile;
@@ -89,6 +97,13 @@ public class ProfileWrapper {
       ows.add(new OperatorWrapper(ip.getLeft(), opmap.get(ip)));
     }
     this.operatorProfiles = ows;
+
+    try {
+      options = mapper.readValue(profile.getOptionsJson(), OptionList.class);
+    } catch (Exception e) {
+      logger.error("Unable to deserialize query options", e);
+      options = new OptionList();
+    }
   }
 
   public boolean hasError() {
@@ -135,5 +150,23 @@ public class ProfileWrapper {
       sep = ", ";
     }
     return sb.append("}").toString();
+  }
+
+  /**
+   * Generates sorted map with properties used to display on Web UI,
+   * where key is property name and value is property string value.
+   * When property value is null, it would be replaced with 'null',
+   * this is achieved using {@link String#valueOf(Object)} method.
+   * Options will be stored in ascending key order, sorted according
+   * to the natural order for the option name represented by {@link String}.
+   *
+   * @return map with properties names and string values
+   */
+  public Map<String, String> getOptions() {
+    final Map<String, String> map = Maps.newTreeMap();
+    for (OptionValue option : options) {
+      map.put(option.getName(), String.valueOf(option.getValue()));
+    }
+    return map;
   }
 }

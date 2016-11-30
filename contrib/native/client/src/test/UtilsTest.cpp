@@ -16,23 +16,36 @@
  * limitations under the License.
  */
 
+#include <string>
 
-#ifndef RPC_DECODER_H
-#define RPC_DECODER_H
+#include <cppunit/TestFixture.h>
+#include <cppunit/extensions/HelperMacros.h>
 
-#include "rpcMessage.hpp"
+#include "utils.hpp"
 
-namespace Drill {
+class UtilsTest: public CppUnit::TestFixture {
+public:
+    UtilsTest() {}
 
-class RpcDecoder {
-    public:
-        RpcDecoder() { }
-        ~RpcDecoder() { }
-        // bool Decode(const DataBuf& buf);
-        // bool Decode(const DataBuf& buf, InBoundRpcMessage& msg);
-        static int LengthDecode(const uint8_t* buf, uint32_t* length); // read the length prefix (at most 4 bytes)
-        static int Decode(const uint8_t* buf, int length, InBoundRpcMessage& msg);
+    CPPUNIT_TEST_SUITE( UtilsTest );
+    CPPUNIT_TEST(testParseConnectStr);
+    CPPUNIT_TEST_SUITE_END();
+
+
+    void testParseConnectStr() {
+        std::string protocol;
+        std::string hostAndPort;
+        std::string path;
+
+        Drill::Utils::parseConnectStr("local=localhost:12345/path/to/drill",
+                path,
+                protocol,
+                hostAndPort);
+
+        CPPUNIT_ASSERT(protocol == "local");
+        CPPUNIT_ASSERT(hostAndPort == "localhost:12345");
+        CPPUNIT_ASSERT(path == "/path/to/drill");
+    }
 };
 
-} // namespace Drill
-#endif
+CPPUNIT_TEST_SUITE_REGISTRATION( UtilsTest );

@@ -35,6 +35,8 @@ public class BaseKuduTest extends BaseTestQuery {
     protected static KuduStoragePlugin storagePlugin;
     protected static KuduStoragePluginConfig storagePluginConfig;
 
+    private final static int OPTIMIZER_MAX_NON_PRIMARY_KEY_ALTERNATIVES = 1;
+
     @BeforeClass
     public static void setupDefaultTestCluster() throws Exception {
         BaseTestQuery.setupDefaultTestCluster();
@@ -42,6 +44,7 @@ public class BaseKuduTest extends BaseTestQuery {
         final StoragePluginRegistry pluginRegistry = getDrillbitContext().getStorage();
         storagePlugin = (KuduStoragePlugin) pluginRegistry.getPlugin(KUDU_STORAGE_PLUGIN_NAME);
         storagePluginConfig = storagePlugin.getConfig();
+        storagePluginConfig = new KuduStoragePluginConfig(storagePluginConfig.getMasterAddresses(), storagePluginConfig.getOperationTimeoutMs(), OPTIMIZER_MAX_NON_PRIMARY_KEY_ALTERNATIVES);
         storagePluginConfig.setEnabled(true);
         pluginRegistry.createOrUpdate(KUDU_STORAGE_PLUGIN_NAME, storagePluginConfig, true);
 

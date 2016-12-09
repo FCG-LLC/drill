@@ -41,16 +41,23 @@ public class KuduScanBatchCreator implements BatchCreator<KuduSubScan>{
     List<RecordReader> readers = Lists.newArrayList();
     List<SchemaPath> columns = null;
 
+    if ((columns = subScan.getColumns())==null) {
+      columns = GroupScan.ALL_COLUMNS;
+    }
+
     for (KuduSubScan.KuduSubScanSpec scanSpec : subScan.getTabletScanSpecList()) {
       try {
-        if ((columns = subScan.getColumns())==null) {
-          columns = GroupScan.ALL_COLUMNS;
-        }
         readers.add(new KuduRecordReader(subScan.getStorageEngine().getClient(), scanSpec, columns, context));
       } catch (Exception e1) {
         throw new ExecutionSetupException(e1);
       }
     }
+
+    // If the predicates ruled-out any scan is necessary, we must still return at least one reader in ScanBatch, so we do this:
+    if (readers.isEmpty()) {
+      readers.add(KuduRecordReader.buildNoDataReader(subScan.getStorageEngine().getClient(), subScan.getTableName(), columns, context));
+    }
+
     return new ScanBatch(subScan, context, readers.iterator());
   }
 

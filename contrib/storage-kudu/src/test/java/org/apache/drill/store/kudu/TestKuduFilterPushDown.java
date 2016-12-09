@@ -17,7 +17,7 @@ public class TestKuduFilterPushDown extends BaseKuduTest {
         runKuduSQLVerifyCount(sql, 5);
 
         final String[] expectedPlan = {".*columns=\\[`key1`\\].*"};
-        final String[] excludedPlan ={};
+        final String[] excludedPlan = {};
         final String sqlKudu = canonizeKuduSQL(sql);
         PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
     }
@@ -35,7 +35,7 @@ public class TestKuduFilterPushDown extends BaseKuduTest {
         runKuduSQLVerifyCount(sql, 3);
 
         final String[] expectedPlan = {".*Predicates on table test_foo: `key2` = \"b\".*"};
-        final String[] excludedPlan ={};
+        final String[] excludedPlan = {};
         final String sqlKudu = canonizeKuduSQL(sql);
         PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
     }
@@ -53,7 +53,7 @@ public class TestKuduFilterPushDown extends BaseKuduTest {
         runKuduSQLVerifyCount(sql, 4);
 
         final String[] expectedPlan = {".*Predicates on table test_foo: \\{`key1` >= 1 AND `key2` = \"a\"\\} OR \\{`key1` >= 1 AND `key2` = \"b\"\\}.*"};
-        final String[] excludedPlan ={};
+        final String[] excludedPlan = {};
         final String sqlKudu = canonizeKuduSQL(sql);
         PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
     }
@@ -71,7 +71,7 @@ public class TestKuduFilterPushDown extends BaseKuduTest {
         runKuduSQLVerifyCount(sql, 1);
 
         final String[] expectedPlan = {".*Predicates on table test_foo: `key1` >= 1.*"};
-        final String[] excludedPlan ={};
+        final String[] excludedPlan = {};
         final String sqlKudu = canonizeKuduSQL(sql);
         PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
     }
@@ -89,7 +89,7 @@ public class TestKuduFilterPushDown extends BaseKuduTest {
         runKuduSQLVerifyCount(sql, 2);
 
         final String[] expectedPlan = {".*Predicates on table test_foo\\: \\{`key1` >= 1 AND `key2` = \"a\"\\} OR \\{`key1` = 3 AND `key2` = \"b\"\\}.*"};
-        final String[] excludedPlan ={};
+        final String[] excludedPlan = {};
         final String sqlKudu = canonizeKuduSQL(sql);
         PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
     }
@@ -113,7 +113,7 @@ public class TestKuduFilterPushDown extends BaseKuduTest {
                 ".*\\{`key2` =\\s+\"b\" AND `key1` = 3\\}.*",
                 ".*\\} OR \\{.*"
         };
-        final String[] excludedPlan ={};
+        final String[] excludedPlan = {};
         final String sqlKudu = canonizeKuduSQL(sql);
         PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
     }
@@ -131,7 +131,7 @@ public class TestKuduFilterPushDown extends BaseKuduTest {
         runKuduSQLVerifyCount(sql, 2);
 
         final String[] expectedPlan = {".*Predicates on table test_foo\\: \\{`key1` < 2 AND `key2` = \"a\"\\} OR \\{`key1` < 2 AND `key2` = \"b\"\\} OR \\{`key1` = 3 AND `key2` = \"a\"\\} OR \\{`key1` = 3 AND `key2` = \"b\"\\}.*"};
-        final String[] excludedPlan ={};
+        final String[] excludedPlan = {};
         final String sqlKudu = canonizeKuduSQL(sql);
         PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
     }
@@ -149,7 +149,7 @@ public class TestKuduFilterPushDown extends BaseKuduTest {
         runKuduSQLVerifyCount(sql, 2);
 
         final String[] expectedPlan = {".*Predicates on table test_foo\\: \\{`key1` >= 1 AND `key2` = \"a\"\\} OR \\{`key1` = 3 AND `key2` = \"a\"\\} OR \\{`key1` = 3 AND `key2` = \"b\"\\}.*"};
-        final String[] excludedPlan ={};
+        final String[] excludedPlan = {};
         final String sqlKudu = canonizeKuduSQL(sql);
         PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
     }
@@ -167,7 +167,7 @@ public class TestKuduFilterPushDown extends BaseKuduTest {
         runKuduSQLVerifyCount(sql, 1);
 
         final String[] expectedPlan = {".*Predicates on table test_foo\\: ,.*"};
-        final String[] excludedPlan ={};
+        final String[] excludedPlan = {};
         final String sqlKudu = canonizeKuduSQL(sql);
         PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
     }
@@ -185,7 +185,7 @@ public class TestKuduFilterPushDown extends BaseKuduTest {
         runKuduSQLVerifyCount(sql, 3);
 
         final String[] expectedPlan = {".*Predicates on table test_foo\\: `key1` < 5,.*"};
-        final String[] excludedPlan ={};
+        final String[] excludedPlan = {};
         final String sqlKudu = canonizeKuduSQL(sql);
         PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
     }
@@ -203,8 +203,42 @@ public class TestKuduFilterPushDown extends BaseKuduTest {
         runKuduSQLVerifyCount(sql, 3);
 
         final String[] expectedPlan = {".*Predicates on table test_foo\\: `key2` >= \"a\",.*"};
-        final String[] excludedPlan ={};
+        final String[] excludedPlan = {};
         final String sqlKudu = canonizeKuduSQL(sql);
         PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
+    }
+
+    @Test
+    public void testConflictingFilterPushDown() throws Exception {
+        setColumnWidths(new int[] {8, 38, 38});
+        final String sql = "SELECT\n"
+                + "  key1\n"
+                + "FROM\n"
+                + "  [TABLE_NAME]\n"
+                + "WHERE\n"
+                + "  (key2 = 'a' AND key2 = 'b')";
+
+        runKuduSQLVerifyCount(sql, 0);
+
+        final String[] expectedPlan = {
+                ".*`key2` = \"a\".*",
+                ".*AND.*",
+                ".*`key2` = \"b\".*"};
+        final String[] excludedPlan = {};
+        final String sqlKudu = canonizeKuduSQL(sql);
+        PlanTestBase.testPlanMatchingPatterns(sqlKudu, expectedPlan, excludedPlan);
+    }
+
+    @Test
+    public void testNoResultsQuery() throws Exception {
+        setColumnWidths(new int[] {8, 38, 38});
+        final String sql = "SELECT\n"
+                + "  key1\n"
+                + "FROM\n"
+                + "  [TABLE_NAME]\n"
+                + "WHERE\n"
+                + "  key2 = 'such value is not present'";
+
+        runKuduSQLVerifyCount(sql, 0);
     }
 }

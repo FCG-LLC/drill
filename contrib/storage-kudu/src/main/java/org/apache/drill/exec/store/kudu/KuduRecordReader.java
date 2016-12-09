@@ -57,6 +57,7 @@ import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.Type;
 import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduException;
 import org.apache.kudu.client.KuduScanner;
 import org.apache.kudu.client.RowResult;
 import org.apache.kudu.client.RowResultIterator;
@@ -66,10 +67,11 @@ import com.google.common.collect.ImmutableList;
 public class KuduRecordReader extends AbstractRecordReader {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(KuduRecordReader.class);
 
-//  private static final int TARGET_RECORD_COUNT = 4000;
-
   private final KuduClient client;
   private final KuduSubScanSpec scanSpec;
+
+  private String tableName;
+
   private KuduScanner scanner;
   private RowResultIterator iterator;
 
@@ -91,6 +93,12 @@ public class KuduRecordReader extends AbstractRecordReader {
     scanSpec = subScanSpec;
   }
 
+  public static KuduRecordReader buildNoDataReader(KuduClient client, String tableName, List<SchemaPath> projectedColumns, FragmentContext context) {
+    KuduRecordReader krr = new KuduRecordReader(client, null, projectedColumns, context);
+    krr.tableName = tableName;
+    return krr;
+  }
+
   @Override
   public void setup(OperatorContext context, OutputMutator output) throws ExecutionSetupException {
     this.output = output;
@@ -99,7 +107,9 @@ public class KuduRecordReader extends AbstractRecordReader {
       context.getStats().startWait();
 
       try {
-        scanner = scanSpec.deserializeIntoScanner(client);
+        if (scanSpec != null) {
+          scanner = scanSpec.deserializeIntoScanner(client);
+        }
       } finally {
         context.getStats().stopWait();
       }
@@ -129,6 +139,11 @@ public class KuduRecordReader extends AbstractRecordReader {
   @Override
   public int next() {
     int rowCount = 0;
+
+    if (scanner == null) {
+      return rowCount;
+    }
+
     try {
       while (iterator == null || !iterator.hasNext()) {
         if (!scanner.hasMoreRows()) {
@@ -143,7 +158,6 @@ public class KuduRecordReader extends AbstractRecordReader {
         }
       }
       for (; iterator.hasNext(); rowCount++) {
-//      for (; rowCount < TARGET_RECORD_COUNT && iterator.hasNext(); rowCount++) {
         addRowResult(iterator.next(), rowCount);
       }
     } catch (Exception ex) {
@@ -355,6 +369,26 @@ public class KuduRecordReader extends AbstractRecordReader {
 
   @Override
   public void close() {
+    if (projectedCols == null) {
+      try {
+        // We must provide any schema or the query will fail. So if no results, lets just get what's available in Kudu schema
+        String table = this.scanSpec == null ? tableName : this.scanSpec.getTableName();
+        Schema schema = client.openTable(table).getSchema();
+        initCols(schema);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      } finally {
+
+      }
+    }
+
+    try {
+      if (scanner != null) {
+        scanner.close();
+      }
+    } catch (KuduException ex) {
+      throw new RuntimeException(ex);
+    }
   }
 
 }

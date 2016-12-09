@@ -55,26 +55,31 @@ public class KuduSubScan extends AbstractBase implements SubScan {
 
   private final KuduStoragePlugin kuduStoragePlugin;
   private final List<KuduSubScanSpec> tabletScanSpecList;
+  private final String tableName;
   private final List<SchemaPath> columns;
+
 
   @JsonCreator
   public KuduSubScan(@JacksonInject StoragePluginRegistry registry,
                       @JsonProperty("storage") StoragePluginConfig storage,
-      @JsonProperty("tabletScanSpecList") LinkedList<KuduSubScanSpec> tabletScanSpecList,
+                      @JsonProperty("tabletScanSpecList") LinkedList<KuduSubScanSpec> tabletScanSpecList,
+                      @JsonProperty("tableName") String tableName,
                       @JsonProperty("columns") List<SchemaPath> columns) throws ExecutionSetupException {
     super((String) null);
     kuduStoragePlugin = (KuduStoragePlugin) registry.getPlugin(storage);
     this.tabletScanSpecList = tabletScanSpecList;
     this.storage = (KuduStoragePluginConfig) storage;
+    this.tableName = tableName;
     this.columns = columns;
   }
 
   public KuduSubScan(KuduStoragePlugin plugin, KuduStoragePluginConfig config,
-      List<KuduSubScanSpec> tabletInfoList, List<SchemaPath> columns) {
+      List<KuduSubScanSpec> tabletInfoList, String tableName, List<SchemaPath> columns) {
     super((String) null);
     kuduStoragePlugin = plugin;
     storage = config;
     this.tabletScanSpecList = tabletInfoList;
+    this.tableName = tableName;
     this.columns = columns;
   }
 
@@ -106,10 +111,14 @@ public class KuduSubScan extends AbstractBase implements SubScan {
     return physicalVisitor.visitSubScan(this, value);
   }
 
+  public String getTableName() {
+    return tableName;
+  }
+
   @Override
   public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) {
     Preconditions.checkArgument(children.isEmpty());
-    return new KuduSubScan(kuduStoragePlugin, storage, tabletScanSpecList, columns);
+    return new KuduSubScan(kuduStoragePlugin, storage, tabletScanSpecList, tableName, columns);
   }
 
   @Override

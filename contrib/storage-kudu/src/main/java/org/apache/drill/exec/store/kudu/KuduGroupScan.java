@@ -278,7 +278,7 @@ public class KuduGroupScan extends AbstractGroupScan {
       scanSpecList.add(new KuduSubScanSpec(getTableName(), work.getSerializedScanToken()));
     }
 
-    return new KuduSubScan(storagePlugin, storagePluginConfig, scanSpecList, this.columns);
+    return new KuduSubScan(storagePlugin, storagePluginConfig, scanSpecList, this.table.getName(), this.columns);
   }
 
   @Override

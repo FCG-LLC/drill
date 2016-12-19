@@ -1,4 +1,5 @@
 #!/bin/bash
+#test
 ddcfg="$HOME/.csapp/deploy-dev.cfg";
 if [[ -f "$ddcfg" ]];
 	then source $ddcfg; 

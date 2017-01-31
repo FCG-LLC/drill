@@ -223,7 +223,6 @@ public class KuduRecordReader extends AbstractRecordReader {
       ValueVector vector = output.addField(field, clazz);
       vector.setInitialCapacity(MAXIMUM_ROWS_SUPPORTED_IN_BATCH);
       vector.allocateNew();
-      
 
       ProjectedColumnInfo pci = new ProjectedColumnInfo();
       pci.vv = vector;

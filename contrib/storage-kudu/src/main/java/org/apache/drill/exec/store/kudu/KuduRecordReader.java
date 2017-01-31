@@ -78,6 +78,8 @@ public class KuduRecordReader extends AbstractRecordReader {
   private OutputMutator output;
   private OperatorContext context;
 
+  public final static int MAXIMUM_ROWS_SUPPORTED_IN_BATCH = 20000;
+
   private static class ProjectedColumnInfo {
     int index;
     ValueVector vv;
@@ -137,35 +139,53 @@ public class KuduRecordReader extends AbstractRecordReader {
   }
 
   @Override
+  // This gets next portion of rows.
+  // Note that scanner and iterator are managed outside of this function - it handles MAXIMUM_ROWS_SUPPORTED_IN_BATCH with each call at most
   public int next() {
     int rowCount = 0;
 
-    if (scanner == null) {
-      return rowCount;
+    if (projectedCols == null) {
+      // First iteration? initCols (called by addRowResult) will handle this.
+    }  else {
+      // Cleanup target vectors
+      for (ProjectedColumnInfo pci : projectedCols) {
+        pci.vv.clear();;
+        pci.vv.allocateNewSafe();
+      }
     }
 
     try {
-      while (iterator == null || !iterator.hasNext()) {
-        if (!scanner.hasMoreRows()) {
-          iterator = null;
-          return 0;
+        if ((iterator != null && iterator.hasNext()) || scanner.hasMoreRows()) {
+          context.getStats().startWait();
+
+          try {
+            if (iterator == null || !iterator.hasNext()) {
+              iterator = scanner.nextRows();
+            }
+
+            for (; iterator.hasNext() && rowCount < MAXIMUM_ROWS_SUPPORTED_IN_BATCH; rowCount++) {
+              addRowResult(iterator.next(), rowCount);
+            }
+          } finally {
+            context.getStats().stopWait();
+          }
         }
-        context.getStats().startWait();
-        try {
-          iterator = scanner.nextRows();
-        } finally {
-          context.getStats().stopWait();
-        }
-      }
-      for (; iterator.hasNext(); rowCount++) {
-        addRowResult(iterator.next(), rowCount);
-      }
     } catch (Exception ex) {
       throw new RuntimeException(ex);
     }
-    for (ProjectedColumnInfo pci : projectedCols) {
-      pci.vv.getMutator().setValueCount(rowCount);
+
+    if (projectedCols == null) {
+      // That's not great, but...
+      if (rowCount > 0) {
+        // only then this is nasty and should not really happen
+        throw new RuntimeException("No projected cols available but there are " + rowCount + " rows that should have been stored...");
+      }
+    } else {
+      for (ProjectedColumnInfo pci : projectedCols) {
+        pci.vv.getMutator().setValueCount(rowCount);
+      }
     }
+
     return rowCount;
   }
 
@@ -201,7 +221,9 @@ public class KuduRecordReader extends AbstractRecordReader {
       final Class<? extends ValueVector> clazz = (Class<? extends ValueVector>) TypeHelper.getValueVectorClass(
           minorType, majorType.getMode());
       ValueVector vector = output.addField(field, clazz);
+      vector.setInitialCapacity(MAXIMUM_ROWS_SUPPORTED_IN_BATCH);
       vector.allocateNew();
+      
 
       ProjectedColumnInfo pci = new ProjectedColumnInfo();
       pci.vv = vector;
@@ -215,6 +237,7 @@ public class KuduRecordReader extends AbstractRecordReader {
 
   private void addRowResult(RowResult result, int rowIndex) throws SchemaChangeException {
     if (projectedCols == null) {
+      // We define the columns with the first known row
       initCols(result.getColumnProjection());
     }
 

@@ -27,7 +27,9 @@ import org.apache.drill.common.expression.visitors.AbstractExprVisitor;
 
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 
+import org.apache.drill.exec.store.ischema.Records;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.Type;
@@ -81,7 +83,6 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
 
         if (CompareFunctionsProcessor.isCompareFunction(functionName)) {
             CompareFunctionsProcessor processor = CompareFunctionsProcessor.process(call, true);
-            /// FIXME: WHY skipping CompareFunctionsProcessor ?
             if (processor.isSuccess()) {
                 nodeScanSpec = createKuduScanSpec(call, processor);
             }
@@ -234,13 +235,95 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
 
         }
 
-        KuduPredicate predicate = new KuduPredicateFactory(colSchema, op).create(originalValue);
 
-        if (predicate != null) {
-            return new KuduScanSpec(groupScan.getTableName(), predicate);
+        // If this are unsigned integers, we must build up to two predicates, unless this was IN or = or <>
+        if (isInequalityOp(op) && isUnsignedIntColumn(colSchema)) {
+            // We convert the inequality for unsigned integer (logical) into two inequalities for signed integer (physical on Kudu)
+            // E.g. we have INT8 and inequality e.g. WHERE x >= 45
+            // This will be broken down into conditions:
+            // x >= 45 OR x < 0
+            // Case 2: WHERE x >= 185
+            // x >= -... AND x < 0
+            // Case 3: WHERE x < 5
+            // x >= 0 AND x < 5
+            // Case 4: WHERE x <= 185
+            // x <= -...OR x >= 0
+
+            switch (op) {
+                case GREATER:
+                case GREATER_EQUAL:
+                    if (((int) originalValue) <= maxSignedValue(colSchema)) {
+                        return new KuduScanSpec(groupScan.getTableName(), Arrays.asList(
+                                new KuduPredicateFactory(colSchema, op).create(originalValue),
+                                new KuduPredicateFactory(colSchema, KuduPredicate.ComparisonOp.LESS).create(0)
+                        ), true);
+                    } else {
+                        return new KuduScanSpec(groupScan.getTableName(), Arrays.asList(
+                                new KuduPredicateFactory(colSchema, op).create(originalValue),
+                                new KuduPredicateFactory(colSchema, KuduPredicate.ComparisonOp.LESS).create(0)
+                        ), false);
+                    }
+                case LESS:
+                case LESS_EQUAL:
+                    if (((int) originalValue) <= maxSignedValue(colSchema)) {
+                        return new KuduScanSpec(groupScan.getTableName(), Arrays.asList(
+                                new KuduPredicateFactory(colSchema, op).create(originalValue),
+                                new KuduPredicateFactory(colSchema, KuduPredicate.ComparisonOp.GREATER_EQUAL).create(0)
+                        ), false);
+                    } else {
+                        return new KuduScanSpec(groupScan.getTableName(), Arrays.asList(
+                                new KuduPredicateFactory(colSchema, op).create(originalValue),
+                                new KuduPredicateFactory(colSchema, KuduPredicate.ComparisonOp.GREATER_EQUAL).create(0)
+                        ), true);
+                    }
+                default:
+                    return null;
+            }
+        } else {
+            KuduPredicate predicate = new KuduPredicateFactory(colSchema, op).create(originalValue);
+
+            if (predicate != null) {
+                return new KuduScanSpec(groupScan.getTableName(), predicate);
+            }
         }
 
         return null;
+    }
+
+    private boolean isUnsignedIntColumn(ColumnSchema columnSchema) {
+        switch (columnSchema.getType()) {
+            case INT8:
+                return groupScan.getStorageConfig().isAllUnsignedINT8();
+            case INT16:
+                return groupScan.getStorageConfig().isAllUnsignedINT16();
+            default:
+                return false;
+        }
+    }
+
+    private boolean isInequalityOp(KuduPredicate.ComparisonOp op) {
+        switch (op) {
+            case GREATER:
+            case GREATER_EQUAL:
+            case LESS:
+            case LESS_EQUAL:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private int maxSignedValue(ColumnSchema columnSchema) {
+        switch (columnSchema.getType()) {
+            case INT8:
+                return Byte.MAX_VALUE;
+            case INT16:
+                return Short.MAX_VALUE;
+            case INT32:
+                return Integer.MAX_VALUE;
+            default:
+                throw new UnsupportedOperationException("Type " + columnSchema.getType() + " for column "+columnSchema.getName()+" is not supported here");
+        }
     }
 
     /**

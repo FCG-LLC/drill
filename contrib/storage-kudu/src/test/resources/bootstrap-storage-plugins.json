@@ -2,7 +2,7 @@
   "storage":{
     kudu : {
       type:"kudu",
-      masterAddresses: "172.31.1.99",
+      masterAddresses: "localhost",
       enabled: true
     }
   }

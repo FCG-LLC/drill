@@ -4,7 +4,7 @@ import org.apache.drill.PlanTestBase;
 import org.junit.Ignore;
 import org.junit.Test;
 
-//@Ignore("requires a remote kudu server to run.")
+@Ignore("requires a remote kudu server to run.")
 public class TestKuduFilterPushDown extends BaseKuduTest {
     @Test
     public void testColumnSelect() throws Exception {

@@ -1,11 +1,13 @@
 {
   "storage":{
-    kudu : {
-      type:"kudu",
-      masterAddresses: "127.0.0.1",
-      operationTimeoutMs: 600000,
-      optimizerMaxNonPrimaryKeyAlternatives: 20,
-      enabled: false
+    "kudu" : {
+      "type":"kudu",
+      "masterAddresses": "127.0.0.1",
+      "operationTimeoutMs": 600000,
+      "optimizerMaxNonPrimaryKeyAlternatives": 20,
+      "allUnsignedINT8": false,
+      "allUnsignedINT16": false,
+      "enabled": false
     }
   }
 }

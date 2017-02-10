@@ -69,15 +69,15 @@ public class TestUnsignedInts extends BaseKuduTest {
                 + "  [TABLE_NAME]\n"
                 + "WHERE ";
 
-        conditionToCount.forEach((k,v) -> {
-                    try {
-                        String sql = baseSql + k;
-                        runKuduSQLVerifyCount(sql, v);
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-        );
+        for (String k : conditionToCount.keySet()) {
+            int v = conditionToCount.get(k);
+            try {
+                String sql = baseSql + k;
+                runKuduSQLVerifyCount(sql, v);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
 }

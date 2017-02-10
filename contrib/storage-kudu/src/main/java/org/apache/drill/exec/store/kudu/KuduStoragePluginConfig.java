@@ -63,15 +63,15 @@ public class KuduStoragePluginConfig extends StoragePluginConfigBase {
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
+    if (this == o) { return true; }
+    if (o == null || getClass() != o.getClass()) { return false; }
 
     KuduStoragePluginConfig that = (KuduStoragePluginConfig) o;
 
-    if (operationTimeoutMs != that.operationTimeoutMs) return false;
-    if (optimizerMaxNonPrimaryKeyAlternatives != that.optimizerMaxNonPrimaryKeyAlternatives) return false;
-    if (allUnsignedINT8 != that.allUnsignedINT8) return false;
-    if (allUnsignedINT16 != that.allUnsignedINT16) return false;
+    if (operationTimeoutMs != that.operationTimeoutMs) { return false; }
+    if (optimizerMaxNonPrimaryKeyAlternatives != that.optimizerMaxNonPrimaryKeyAlternatives) { return false; }
+    if (allUnsignedINT8 != that.allUnsignedINT8) { return false; }
+    if (allUnsignedINT16 != that.allUnsignedINT16) { return false; }
 
     return masterAddresses != null ? masterAddresses.equals(that.masterAddresses) : that.masterAddresses == null;
   }

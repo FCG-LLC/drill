@@ -55,6 +55,12 @@ public class KuduScanSpec {
     this.predicates.addAll(preds);
   }
 
+  public KuduScanSpec(@JsonProperty("tableName") String tableName, @JsonProperty("predicates") Collection<KuduPredicate> preds, @JsonProperty("pushOr") boolean pushOr) {
+    this.tableName = tableName;
+    this.predicates.addAll(preds);
+    this.pushOr = pushOr;
+  }
+
   @Override
   protected KuduScanSpec clone() throws CloneNotSupportedException {
     KuduScanSpec newOne = new KuduScanSpec(tableName, predicates);

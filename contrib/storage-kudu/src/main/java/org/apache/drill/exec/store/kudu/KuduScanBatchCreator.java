@@ -47,7 +47,7 @@ public class KuduScanBatchCreator implements BatchCreator<KuduSubScan>{
 
     for (KuduSubScan.KuduSubScanSpec scanSpec : subScan.getTabletScanSpecList()) {
       try {
-        readers.add(new KuduRecordReader(subScan.getStorageEngine().getClient(), scanSpec, columns, context));
+        readers.add(new KuduRecordReader(subScan.getStorageEngine().getClient(), scanSpec, subScan.getStorageConfig(), columns, context));
       } catch (Exception e1) {
         throw new ExecutionSetupException(e1);
       }

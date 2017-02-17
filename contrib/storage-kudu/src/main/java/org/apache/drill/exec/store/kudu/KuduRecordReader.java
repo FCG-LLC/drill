@@ -69,6 +69,10 @@ public class KuduRecordReader extends AbstractRecordReader {
 
   private final KuduClient client;
   private final KuduSubScanSpec scanSpec;
+  private final KuduStoragePluginConfig pluginConfig;
+
+  private final boolean allUnsignedINT8;
+  private final boolean allUnsignedINT16;
 
   private String tableName;
 
@@ -88,15 +92,25 @@ public class KuduRecordReader extends AbstractRecordReader {
 
   private ImmutableList<ProjectedColumnInfo> projectedCols;
 
-  public KuduRecordReader(KuduClient client, KuduSubScan.KuduSubScanSpec subScanSpec,
+  public KuduRecordReader(KuduClient client, KuduSubScan.KuduSubScanSpec subScanSpec, KuduStoragePluginConfig pluginConfig,
       List<SchemaPath> projectedColumns, FragmentContext context) {
-    setColumns(projectedColumns);
     this.client = client;
-    scanSpec = subScanSpec;
+    this.pluginConfig = pluginConfig;
+    this.scanSpec = subScanSpec;
+
+    if (this.pluginConfig != null) {
+      this.allUnsignedINT8 = this.pluginConfig.isAllUnsignedINT8();
+      this.allUnsignedINT16 = this.pluginConfig.isAllUnsignedINT16();
+    } else {
+      this.allUnsignedINT8 = false;
+      this.allUnsignedINT16 = false;
+    }
+
+    setColumns(projectedColumns);
   }
 
   public static KuduRecordReader buildNoDataReader(KuduClient client, String tableName, List<SchemaPath> projectedColumns, FragmentContext context) {
-    KuduRecordReader krr = new KuduRecordReader(client, null, projectedColumns, context);
+    KuduRecordReader krr = new KuduRecordReader(client, null, null, projectedColumns, context);
     krr.tableName = tableName;
     return krr;
   }
@@ -105,6 +119,7 @@ public class KuduRecordReader extends AbstractRecordReader {
   public void setup(OperatorContext context, OutputMutator output) throws ExecutionSetupException {
     this.output = output;
     this.context = context;
+
     try {
       context.getStats().startWait();
 
@@ -234,6 +249,22 @@ public class KuduRecordReader extends AbstractRecordReader {
     projectedCols = pciBuilder.build();
   }
 
+  private int transformINT16(short in) {
+    if (allUnsignedINT16) {
+      return Short.toUnsignedInt(in);
+    } else {
+      return in;
+    }
+  }
+
+  private int transformINT8(byte in) {
+    if (allUnsignedINT16) {
+      return Byte.toUnsignedInt(in);
+    } else {
+      return in;
+    }
+  }
+
   private void addRowResult(RowResult result, int rowIndex) throws SchemaChangeException {
     if (projectedCols == null) {
       // We define the columns with the first known row
@@ -320,11 +351,11 @@ public class KuduRecordReader extends AbstractRecordReader {
                     .setNull(rowIndex);
           } else {
             ((NullableIntVector.Mutator) pci.vv.getMutator())
-                    .setSafe(rowIndex, result.getShort(pci.index));
+                    .setSafe(rowIndex, transformINT16(result.getShort(pci.index)));
           }
         } else {
           ((IntVector.Mutator) pci.vv.getMutator())
-              .setSafe(rowIndex, result.getShort(pci.index));
+                  .setSafe(rowIndex, transformINT16(result.getShort(pci.index)));
         }
         break;
       case INT32:
@@ -348,11 +379,11 @@ public class KuduRecordReader extends AbstractRecordReader {
                     .setNull(rowIndex);
           } else {
             ((NullableIntVector.Mutator) pci.vv.getMutator())
-                    .setSafe(rowIndex, result.getByte(pci.index));
+                    .setSafe(rowIndex, transformINT8(result.getByte(pci.index)));
           }
         } else {
           ((IntVector.Mutator) pci.vv.getMutator())
-              .setSafe(rowIndex, result.getByte(pci.index));
+              .setSafe(rowIndex, transformINT8(result.getByte(pci.index)));
         }
         break;
       case INT64:

@@ -29,7 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public class BaseKuduTest extends BaseTestQuery {
-    private static final String KUDU_STORAGE_PLUGIN_NAME = "kudu";
+    public static final String KUDU_STORAGE_PLUGIN_NAME = "kudu";
     private static final String TEST_TABLE_1 = "test_foo";
 
     protected static KuduStoragePlugin storagePlugin;
@@ -44,7 +44,7 @@ public class BaseKuduTest extends BaseTestQuery {
         final StoragePluginRegistry pluginRegistry = getDrillbitContext().getStorage();
         storagePlugin = (KuduStoragePlugin) pluginRegistry.getPlugin(KUDU_STORAGE_PLUGIN_NAME);
         storagePluginConfig = storagePlugin.getConfig();
-        storagePluginConfig = new KuduStoragePluginConfig(storagePluginConfig.getMasterAddresses(), storagePluginConfig.getOperationTimeoutMs(), OPTIMIZER_MAX_NON_PRIMARY_KEY_ALTERNATIVES);
+        storagePluginConfig = new KuduStoragePluginConfig(storagePluginConfig.getMasterAddresses(), storagePluginConfig.getOperationTimeoutMs(), OPTIMIZER_MAX_NON_PRIMARY_KEY_ALTERNATIVES, true, true);
         storagePluginConfig.setEnabled(true);
         pluginRegistry.createOrUpdate(KUDU_STORAGE_PLUGIN_NAME, storagePluginConfig, true);
 
@@ -62,7 +62,8 @@ public class BaseKuduTest extends BaseTestQuery {
             List<ColumnSchema> columns = new ArrayList<>(4);
             columns.add(new ColumnSchema.ColumnSchemaBuilder("key1", Type.INT32).key(true).build());
             columns.add(new ColumnSchema.ColumnSchemaBuilder("key2", Type.STRING).key(true).build());
-            columns.add(new ColumnSchema.ColumnSchemaBuilder("key3", Type.INT32).key(true).build());
+            columns.add(new ColumnSchema.ColumnSchemaBuilder("key3", Type.INT8).key(true).build());
+            columns.add(new ColumnSchema.ColumnSchemaBuilder("x", Type.INT16).key(false).build());
             columns.add(new ColumnSchema.ColumnSchemaBuilder("str",  Type.STRING).nullable(true).build());
 
             Schema schema = new Schema(columns);
@@ -79,7 +80,8 @@ public class BaseKuduTest extends BaseTestQuery {
 
             int[] key1_values =    {    1,    2,    2,    3,    4 };
             String[] key2_values = {  "a",  "b",  "b",  "b",  "d" };
-            int[] key3_values =    {  101,  102,  103,  104,  105 };
+            byte[] key3_values =   {  101,  102,  103,  104,  (byte) 205 };
+            short[] x_values =     {    1,    0,  Short.MAX_VALUE, (short) 40500, (short) 65535 };
             String[] str_values =  { "xx", "yy", "zz", "uu", "vv" };
 
             for (int i = 0; i < key1_values.length; i++) {
@@ -87,8 +89,9 @@ public class BaseKuduTest extends BaseTestQuery {
                 PartialRow row = insert.getRow();
                 row.addInt(0, key1_values[i]);
                 row.addString(1, key2_values[i]);
-                row.addInt(2, key3_values[i]);
-                row.addString(3, str_values[i]);
+                row.addByte(2, key3_values[i]);
+                row.addShort( 3, x_values[i]);
+                row.addString(4, str_values[i]);
                 session.apply(insert);
             }
         }

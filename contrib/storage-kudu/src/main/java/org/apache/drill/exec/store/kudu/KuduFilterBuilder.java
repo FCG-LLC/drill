@@ -302,6 +302,10 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
     }
 
     private boolean isInequalityOp(KuduPredicate.ComparisonOp op) {
+        if (op == null) {
+            return false;
+        }
+
         switch (op) {
             case GREATER:
             case GREATER_EQUAL:

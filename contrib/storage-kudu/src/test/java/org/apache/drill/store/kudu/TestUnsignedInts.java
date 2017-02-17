@@ -80,4 +80,32 @@ public class TestUnsignedInts extends BaseKuduTest {
         }
     }
 
+
+    @Test
+    public void testColumnSelectNotEq() throws Exception {
+        final StoragePluginRegistry pluginRegistry = getDrillbitContext().getStorage();
+        storagePlugin = (KuduStoragePlugin) pluginRegistry.getPlugin(BaseKuduTest.KUDU_STORAGE_PLUGIN_NAME);
+        storagePluginConfig = storagePlugin.getConfig();
+        storagePluginConfig = new KuduStoragePluginConfig(
+                storagePluginConfig.getMasterAddresses(),
+                storagePluginConfig.getOperationTimeoutMs(),
+                100,
+                true,
+                true);
+        storagePluginConfig.setEnabled(true);
+        pluginRegistry.createOrUpdate(KUDU_STORAGE_PLUGIN_NAME, storagePluginConfig, true);
+
+        setColumnWidths(new int[] {8, 38, 38});
+        setColumnWidths(new int[] {8, 38, 38});
+
+        final String sql = "SELECT\n"
+                + "  key1, key3, x\n"
+                + "FROM\n"
+                + "  [TABLE_NAME]\n"
+                + "WHERE\n"
+                + "  key2 <> 'a'";
+
+        runKuduSQLVerifyCount(sql, 4);
+    }
+
 }

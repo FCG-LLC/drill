@@ -159,6 +159,9 @@ public class KuduRecordReader extends AbstractRecordReader {
   public int next() {
     int rowCount = 0;
 
+    if (scanner == null)
+      return rowCount;
+
     if (projectedCols == null) {
       // First iteration? initCols (called by addRowResult) will handle this.
     }  else {
@@ -258,7 +261,7 @@ public class KuduRecordReader extends AbstractRecordReader {
   }
 
   private int transformINT8(byte in) {
-    if (allUnsignedINT16) {
+    if (allUnsignedINT8) {
       return Byte.toUnsignedInt(in);
     } else {
       return in;

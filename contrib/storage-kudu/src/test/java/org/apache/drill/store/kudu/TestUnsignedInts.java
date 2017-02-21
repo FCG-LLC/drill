@@ -8,6 +8,7 @@ import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.kudu.KuduStoragePlugin;
 import org.apache.drill.exec.store.kudu.KuduStoragePluginConfig;
 import org.apache.kudu.util.Pair;
+import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -48,8 +49,8 @@ public class TestUnsignedInts extends BaseKuduTest {
             .put("x <= 65535", 5)
             .build();
 
-    @Test
-    public void testColumnSelects() throws Exception {
+    @Before
+    public void preparePlugin() throws Exception {
         final StoragePluginRegistry pluginRegistry = getDrillbitContext().getStorage();
         storagePlugin = (KuduStoragePlugin) pluginRegistry.getPlugin(BaseKuduTest.KUDU_STORAGE_PLUGIN_NAME);
         storagePluginConfig = storagePlugin.getConfig();
@@ -61,6 +62,10 @@ public class TestUnsignedInts extends BaseKuduTest {
                 true);
         storagePluginConfig.setEnabled(true);
         pluginRegistry.createOrUpdate(KUDU_STORAGE_PLUGIN_NAME, storagePluginConfig, true);
+    }
+
+    @Test
+    public void testColumnSelects() throws Exception {
 
         setColumnWidths(new int[] {8, 38, 38});
         final String baseSql = "SELECT\n"
@@ -83,18 +88,6 @@ public class TestUnsignedInts extends BaseKuduTest {
 
     @Test
     public void testColumnSelectNotEq() throws Exception {
-        final StoragePluginRegistry pluginRegistry = getDrillbitContext().getStorage();
-        storagePlugin = (KuduStoragePlugin) pluginRegistry.getPlugin(BaseKuduTest.KUDU_STORAGE_PLUGIN_NAME);
-        storagePluginConfig = storagePlugin.getConfig();
-        storagePluginConfig = new KuduStoragePluginConfig(
-                storagePluginConfig.getMasterAddresses(),
-                storagePluginConfig.getOperationTimeoutMs(),
-                100,
-                true,
-                true);
-        storagePluginConfig.setEnabled(true);
-        pluginRegistry.createOrUpdate(KUDU_STORAGE_PLUGIN_NAME, storagePluginConfig, true);
-
         setColumnWidths(new int[] {8, 38, 38});
         setColumnWidths(new int[] {8, 38, 38});
 
@@ -108,4 +101,19 @@ public class TestUnsignedInts extends BaseKuduTest {
         runKuduSQLVerifyCount(sql, 4);
     }
 
+    @Test
+    public void testColumnTwoEqualsNotPresent() throws Exception {
+        setColumnWidths(new int[] {8, 38, 38});
+        setColumnWidths(new int[] {8, 38, 38});
+
+        final String sql = "SELECT\n"
+                + "  key1, key3, x\n"
+                + "FROM\n"
+                + "  [TABLE_NAME]\n"
+                + "WHERE\n"
+                + "  (key3 = 99 AND x = 100)\n"
+                + "ORDER BY key3";
+
+        runKuduSQLVerifyCount(sql, 0);
+    }
 }

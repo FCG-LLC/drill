@@ -159,8 +159,9 @@ public class KuduRecordReader extends AbstractRecordReader {
   public int next() {
     int rowCount = 0;
 
-    if (scanner == null)
+    if (scanner == null) {
       return rowCount;
+    }
 
     if (projectedCols == null) {
       // First iteration? initCols (called by addRowResult) will handle this.

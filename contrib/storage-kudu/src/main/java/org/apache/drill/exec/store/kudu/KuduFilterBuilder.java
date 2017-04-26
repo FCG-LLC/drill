@@ -249,10 +249,13 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
             // Case 4: WHERE x <= 185
             // x <= -...OR x >= 0
 
+            boolean scanNegative = originalValue instanceof Integer;
+            scanNegative = scanNegative && ((int) originalValue) <= maxSignedValue(colSchema);
+
             switch (op) {
                 case GREATER:
                 case GREATER_EQUAL:
-                    if (((int) originalValue) <= maxSignedValue(colSchema)) {
+                    if (scanNegative) {
                         return new KuduScanSpec(groupScan.getTableName(), Arrays.asList(
                                 new KuduPredicateFactory(colSchema, op).create(originalValue),
                                 new KuduPredicateFactory(colSchema, KuduPredicate.ComparisonOp.LESS).create(0)
@@ -265,7 +268,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                     }
                 case LESS:
                 case LESS_EQUAL:
-                    if (((int) originalValue) <= maxSignedValue(colSchema)) {
+                    if (scanNegative) {
                         return new KuduScanSpec(groupScan.getTableName(), Arrays.asList(
                                 new KuduPredicateFactory(colSchema, op).create(originalValue),
                                 new KuduPredicateFactory(colSchema, KuduPredicate.ComparisonOp.GREATER_EQUAL).create(0)
@@ -296,6 +299,8 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                 return groupScan.getStorageConfig().isAllUnsignedINT8();
             case INT16:
                 return groupScan.getStorageConfig().isAllUnsignedINT16();
+            case INT32:
+                return groupScan.getStorageConfig().isAllUnsignedINT32();
             default:
                 return false;
         }
@@ -317,7 +322,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
         }
     }
 
-    private int maxSignedValue(ColumnSchema columnSchema) {
+    private long maxSignedValue(ColumnSchema columnSchema) {
         switch (columnSchema.getType()) {
             case INT8:
                 return Byte.MAX_VALUE;
@@ -325,6 +330,8 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                 return Short.MAX_VALUE;
             case INT32:
                 return Integer.MAX_VALUE;
+            case INT64:
+                return Long.MAX_VALUE;
             default:
                 throw new UnsupportedOperationException("Type " + columnSchema.getType() + " for column "+columnSchema.getName()+" is not supported here");
         }
@@ -355,7 +362,7 @@ public class KuduFilterBuilder extends AbstractExprVisitor<KuduScanSpec, Void, R
                 case INT16:
                     return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, ((Integer) originalValue).shortValue());
                 case INT32:
-                    return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, (int) originalValue);
+                    return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, ((Number) originalValue).intValue());
                 case INT64:
                     if (originalValue instanceof Integer) {
                         return KuduPredicate.newComparisonPredicate(columnSchema, comparisonOp, ((Integer) originalValue).longValue());

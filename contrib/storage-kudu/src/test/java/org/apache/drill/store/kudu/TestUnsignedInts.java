@@ -41,18 +41,18 @@ public class TestUnsignedInts extends BaseKuduTest {
             .put("x >= 65535", 1)
             .put("x > 65535", 0)
             .put("x <= 65535", 5)
-            .put("key1 >= 0", 5)
-            .put("key1 > 0", 4)
-            .put("key1 > 10000", 3)
-            .put("key1 >= 2147483647", 3)
-            .put("key1 <= 2147483647", 3)
-            .put("key1 < 2147483647", 2)
-            .put("key1 >= 2147483648", 2)
-            .put("key1 <= 2147483648", 3)
-            .put("key1 < 2147483648", 3)
-            .put("key1 >= 4200000000", 1)
-            .put("key1 > 4200000001", 0)
-            .put("key1 <= 4200000000", 5)
+            .put("key4 >= 0", 5)
+            .put("key4 > 0", 4)
+            .put("key4 > 10000", 3)
+            .put("key4 >= 2147483647", 3)
+            .put("key4 <= 2147483647", 3)
+            .put("key4 < 2147483647", 2)
+            .put("key4 >= 2147483648", 2)
+            .put("key4 <= 2147483648", 3)
+            .put("key4 < 2147483648", 3)
+            .put("key4 >= 4200000000", 1)
+            .put("key4 > 4200000001", 0)
+            .put("key4 <= 4200000000", 5)
             .build();
 
     @Before
@@ -76,7 +76,7 @@ public class TestUnsignedInts extends BaseKuduTest {
 
         setColumnWidths(new int[] {38, 38, 38});
         final String baseSql = "SELECT\n"
-                + "  key1, key3, x\n"
+                + "  key4, key3, x\n"
                 + "FROM\n"
                 + "  [TABLE_NAME]\n"
                 + "WHERE ";
@@ -96,10 +96,9 @@ public class TestUnsignedInts extends BaseKuduTest {
     @Test
     public void testColumnSelectNotEq() throws Exception {
         setColumnWidths(new int[] {8, 38, 38});
-        setColumnWidths(new int[] {8, 38, 38});
 
         final String sql = "SELECT\n"
-                + "  key1, key3, x\n"
+                + "  key4, key3, x\n"
                 + "FROM\n"
                 + "  [TABLE_NAME]\n"
                 + "WHERE\n"
@@ -111,10 +110,9 @@ public class TestUnsignedInts extends BaseKuduTest {
     @Test
     public void testColumnTwoEqualsNotPresent() throws Exception {
         setColumnWidths(new int[] {8, 38, 38});
-        setColumnWidths(new int[] {8, 38, 38});
 
         final String sql = "SELECT\n"
-                + "  key1, key3, x\n"
+                + "  key4, key3, x\n"
                 + "FROM\n"
                 + "  [TABLE_NAME]\n"
                 + "WHERE\n"

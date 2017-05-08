@@ -21,7 +21,7 @@ import org.apache.drill.BaseTestQuery;
 import org.junit.Ignore;
 import org.junit.Test;
 
-@Ignore("requires a remote kudu server to run.")
+@Ignore
 public class TestKuduPlugin extends BaseTestQuery {
 
   @Test

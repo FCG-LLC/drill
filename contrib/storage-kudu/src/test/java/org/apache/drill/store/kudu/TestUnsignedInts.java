@@ -1,20 +1,14 @@
 package org.apache.drill.store.kudu;
 
-import com.codahale.metrics.MetricRegistryListener;
 import com.google.common.collect.ImmutableMap;
-import org.apache.drill.PlanTestBase;
-import org.apache.drill.common.scanner.RunTimeScan;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.kudu.KuduStoragePlugin;
 import org.apache.drill.exec.store.kudu.KuduStoragePluginConfig;
-import org.apache.kudu.util.Pair;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Map;
 
-//@Ignore("requires a remote kudu server to run.")
 public class TestUnsignedInts extends BaseKuduTest {
 
     private Map<String,Integer> conditionToCount = ImmutableMap.<String,Integer>builder()

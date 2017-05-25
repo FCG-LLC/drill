@@ -42,6 +42,9 @@ RUN wget https://jdbc.postgresql.org/download/postgresql-9.4.1212.jre6.jar -P /o
 # install drill-geoip
 RUN apt-get install apache-drill-geoip=*$destEnv
 
+# install drill-ip-enrichment
+RUN apt-get install apache-drill-ip-enrichment=*$destEnv
+
 RUN chown drill:drill /tmp/drill
 RUN chmod 700 /tmp/drill
 

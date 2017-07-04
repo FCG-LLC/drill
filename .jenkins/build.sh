@@ -3,12 +3,12 @@
 cd $WORKSPACE/source
 
 if test "${branch#*tags/}" != "$branch"; then
-	VERSION="target\/apache-drill-${branch#tags/}"
-    VERSION_CONTROL="Version: ${branch#tags/}"
+  VERSION="target\/apache-drill-${branch#tags/}"
+  VERSION_CONTROL="Version: ${branch#tags/}"
 else
-	SHORT_COMMIT=`expr substr $GIT_COMMIT 1 7`
-	VERSION="target\/apache-drill-\${project.version\}-\${maven.build.timestamp\}-$SHORT_COMMIT-$destEnv"
-    VERSION_CONTROL="Version: [[project.version]]-[[buildTimestamp]]-$SHORT_COMMIT-$destEnv"   
+  SHORT_COMMIT=`expr substr $GIT_COMMIT 1 7`
+  VERSION="target\/apache-drill-\${project.version\}-\${maven.build.timestamp\}-$SHORT_COMMIT-$destEnv"
+  VERSION_CONTROL="Version: [[project.version]]-[[buildTimestamp]]-$SHORT_COMMIT-$destEnv"   
 fi
 
 sed -i "s/Version.*/$VERSION_CONTROL/" distribution/src/deb/control/control

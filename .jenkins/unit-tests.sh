@@ -2,10 +2,10 @@
 
 docker build -t cs/drill_dev_unit_test .
 docker run \
-	--rm \
+  --rm \
     -e BUILD_URL \
     -e JENKINS=1 \
     -v `pwd`:`pwd` \
     -w `pwd` \
     -P cs/drill_dev_unit_test \
-    sh .jenkins/run_all.sh
+    sh .ci/run_all.sh

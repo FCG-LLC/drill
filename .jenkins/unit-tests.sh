@@ -2,7 +2,7 @@
 
 set -ex
 
-docker build -t cs/drill_dev_unit_test .
+docker build --build-arg destEnv=$destEnv -t cs/drill_dev_unit_test .
 docker run \
   --rm \
     -e BUILD_URL \

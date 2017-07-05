@@ -1,5 +1,5 @@
 FROM ubuntu:16.04
-
+ARG destEnv
 # config
 ENV GITHUB_TOKEN=263f9ede48d798f8d1f92bbefe34f34064ec6f3f
 
@@ -16,6 +16,8 @@ RUN apt-get install -y \
 RUN cd /etc/apt/sources.list.d && \
     wget -qO - http://archive.cloudera.com/beta/kudu/ubuntu/trusty/amd64/kudu/archive.key | apt-key add - && \
     wget http://archive.cloudera.com/beta/kudu/ubuntu/trusty/amd64/kudu/cloudera.list && \
+    echo "deb http://10.12.1.225/public xenial $destEnv" >> /etc/apt/sources.list && \
+    printf "Package: * \nPin: release a=xenial, o=10.12.1.225 \nPin-Priority: 1600 \n" > /etc/apt/preferences && \
     apt-get update && \
     apt-get -y dist-upgrade && \
     apt-get -y install kudu kudu-master kudu-tserver libkuduclient0 libkuduclient-dev

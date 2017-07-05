@@ -9,8 +9,8 @@ if test "${branch#*tags/}" != "$branch"; then
   VERSION_CONTROL="Version: ${branch#tags/}"
 else
   SHORT_COMMIT=`expr substr $GIT_COMMIT 1 7`
-  VERSION="target\/apache-drill-\${project.version\}-\${maven.build.timestamp\}-$SHORT_COMMIT-$destEnv"
-  VERSION_CONTROL="Version: [[project.version]]-[[buildTimestamp]]-$SHORT_COMMIT-$destEnv"   
+  VERSION="target\/apache-drill-\${project.version\}-\${maven.build.timestamp\}-$SHORT_COMMIT"
+  VERSION_CONTROL="Version: [[project.version]]-[[buildTimestamp]]-$SHORT_COMMIT"   
 fi
 
 sed -i "s/Version.*/$VERSION_CONTROL/" distribution/src/deb/control/control
@@ -20,7 +20,7 @@ cd target
 DRILL_DEB=`ls | grep drill | grep deb`
 APTLY_SERVER=http://10.12.1.225:8080
 curl -X POST -F file=@$DRILL_DEB http://10.12.1.225:8080/api/files/$DRILL_DEB
-curl -X POST http://10.12.1.225:8080/api/repos/main/file/$DRILL_DEB
+curl -X POST http://10.12.1.225:8080/api/repos/$destEnv/file/$DRILL_DEB
 ssh -tt -i ~/.ssh/aptly_rsa aptly@10.12.1.225
 
 echo version="$VERSION" > env.properties

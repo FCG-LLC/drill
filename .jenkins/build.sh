@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -ex
+
 cd $WORKSPACE/source
 
 if test "${branch#*tags/}" != "$branch"; then

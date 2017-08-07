@@ -1,4 +1,13 @@
 #!/bin/bash
+function retry() {
+    count=$1
+    slp=$2
+    cmd=$3
+    ( for i in $(seq 0 $count); do 
+        [ $i -gt 0 ] && echo "---- Rerying $i time ----"; $cmd && break || [ $i -lt $count ] && echo "---- FAILURE, waiting $slp secs ----" && sleep $slp || exit;
+     done ) || return 1
+}
+
 
 set -ex
 
@@ -19,8 +28,8 @@ mvn -e -DskipTests -P deb install
 cd target
 DRILL_DEB=`ls | grep drill | grep deb`
 APTLY_SERVER=http://10.12.1.225:8080
-curl -X POST -F file=@$DRILL_DEB http://10.12.1.225:8080/api/files/$DRILL_DEB
-curl -X POST http://10.12.1.225:8080/api/repos/$destEnv/file/$DRILL_DEB
+retry 5 15 "curl -X POST -F file=@$DRILL_DEB http://10.12.1.225:8080/api/files/$DRILL_DEB"
+retry 5 15 "curl -X POST http://10.12.1.225:8080/api/repos/$destEnv/file/$DRILL_DEB"
 ssh -tt -i ~/.ssh/aptly_rsa aptly@10.12.1.225
 
 echo version="$VERSION" > env.properties
@@ -29,4 +38,4 @@ cd $WORKSPACE/source
 cd dockerization
 docker build --build-arg destEnv=$destEnv --no-cache -t cs/$app .
 docker tag cs/$app portus.cs.int:5000/$destEnv/cs-$app
-docker push portus.cs.int:5000/$destEnv/cs-$app
+retry 5 15 "docker push portus.cs.int:5000/$destEnv/cs-$app"

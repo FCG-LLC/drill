@@ -14,9 +14,8 @@ RUN apt-get install -y \
 
 # Apache Kudu
 RUN cd /etc/apt/sources.list.d && \
-    wget -qO - http://archive.cloudera.com/beta/kudu/ubuntu/trusty/amd64/kudu/archive.key | apt-key add - && \
-    wget http://archive.cloudera.com/beta/kudu/ubuntu/trusty/amd64/kudu/cloudera.list && \
     echo "deb http://10.12.1.225/public xenial $destEnv" >> /etc/apt/sources.list && \
+    wget http://10.12.1.225/public/cs-repo.key -O /tmp/cs-repo.key && apt-key add /tmp/cs-repo.key && rm -f /tmp/cs-repo.key && \
     printf "Package: * \nPin: release a=xenial, o=10.12.1.225 \nPin-Priority: 1600 \n" > /etc/apt/preferences && \
     apt-get update && \
     apt-get -y dist-upgrade && \

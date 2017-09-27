@@ -84,6 +84,11 @@
   </logger>
    -->
 
+  <logger name="cs.drill" additivity="false">
+    <level value="info" />
+    <appender-ref ref="STDOUT" />
+  </logger>
+
   <root>
     <level value="error" />
     <appender-ref ref="STDOUT" />

@@ -17,9 +17,7 @@ RUN wget http://10.12.1.225/public/cs-repo.key -O /tmp/cs-repo.key && apt-key ad
 RUN echo "deb http://10.12.1.225/public xenial $destEnv" >> /etc/apt/sources.list
 RUN printf "Package: * \nPin: release a=xenial, o=10.12.1.225 \nPin-Priority: 1600 \n" > /etc/apt/preferences
 
-
 RUN apt-get install curl software-properties-common paxctl pax-utils -y
-RUN apt-get install supervisor -y
 RUN add-apt-repository ppa:webupd8team/java -y
 RUN apt-get update -y
 RUN echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | /usr/bin/debconf-set-selections
@@ -27,8 +25,6 @@ RUN apt-get install -y oracle-java8-installer vim -y
 
 RUN groupadd -g 10007 drill
 RUN adduser --system --shell /bin/false --gecos 'drill dedicated user' --uid 10007 --gid 10007 --disabled-password drill
-
-
 
 RUN mkdir /data
 RUN mkdir -p /drill-scripts
@@ -55,10 +51,8 @@ RUN paxctl -c /usr/lib/jvm/java-8-oracle/jre/bin/java && paxctl -m /usr/lib/jvm/
 COPY files/drill_ddl.sql /
 COPY files/test.sql /tmp/
 COPY files/docker-entrypoint.sh /
-ENTRYPOINT ["/docker-entrypoint.sh"]
 
-ADD files/conf/supervisor_drill.conf /etc/supervisor/conf.d/
-
-CMD /usr/bin/supervisord -n
+USER drill
+CMD ["/docker-entrypoint.sh"]
 
 EXPOSE 8047

@@ -46,11 +46,7 @@ import org.apache.drill.exec.store.schedule.CompleteWork;
 import org.apache.drill.exec.store.schedule.EndpointByteMap;
 import org.apache.drill.exec.store.schedule.EndpointByteMapImpl;
 import org.apache.kudu.Schema;
-import org.apache.kudu.client.KuduClient;
-import org.apache.kudu.client.KuduException;
-import org.apache.kudu.client.KuduPredicate;
-import org.apache.kudu.client.KuduScanToken;
-import org.apache.kudu.client.KuduTable;
+import org.apache.kudu.client.*;
 import org.apache.kudu.client.LocatedTablet.Replica;
 
 import java.io.IOException;
@@ -64,7 +60,11 @@ import java.util.Map;
 @JsonTypeName("kudu-scan")
 public class KuduGroupScan extends AbstractGroupScan {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(KuduGroupScan.class);
-  private static final long DEFAULT_TABLET_SIZE = 1000;
+  private static final long DEFAULT_TABLET_SIZE = 10000;
+
+  public static final long ESTIMATED_RECORD_COUNT_PER_PARTITION = 50000;
+  private static final long MIN_HASH_BUCKETS = 1;
+
 
   private KuduStoragePluginConfig storagePluginConfig;
   private List<SchemaPath> columns;
@@ -281,11 +281,24 @@ public class KuduGroupScan extends AbstractGroupScan {
     return new KuduSubScan(storagePlugin, storagePluginConfig, scanSpecList, this.table.getName(), this.columns);
   }
 
+  private long getHashBuckets() {
+    if (table == null) {
+      return MIN_HASH_BUCKETS;
+    }
+    List<PartitionSchema.HashBucketSchema> hbSchema = table.getPartitionSchema().getHashBucketSchemas();
+    if (hbSchema.size() > 0) {
+      return Math.max(MIN_HASH_BUCKETS, hbSchema.iterator().next().getNumBuckets());
+    } else {
+      return MIN_HASH_BUCKETS;
+    }
+  }
+
   @Override
   public ScanStats getScanStats() {
     // Very naive - we just assume the more constraints the better...
     int constraintsDenominator = kuduScanSpecSize(0, kuduScanSpec) + 1;
-    long recordCount = (100000 / constraintsDenominator);
+
+    long recordCount = (getHashBuckets() * ESTIMATED_RECORD_COUNT_PER_PARTITION / constraintsDenominator);
 
     int columnsNominator = AbstractRecordReader.isStarQuery(columns) ? this.getTableSchema().getColumns().size() : this.getColumns().size();
 

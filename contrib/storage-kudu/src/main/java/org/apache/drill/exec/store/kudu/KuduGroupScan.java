@@ -46,8 +46,13 @@ import org.apache.drill.exec.store.schedule.CompleteWork;
 import org.apache.drill.exec.store.schedule.EndpointByteMap;
 import org.apache.drill.exec.store.schedule.EndpointByteMapImpl;
 import org.apache.kudu.Schema;
-import org.apache.kudu.client.*;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduTable;
+import org.apache.kudu.client.KuduException;
+import org.apache.kudu.client.KuduPredicate;
+import org.apache.kudu.client.KuduScanToken;
 import org.apache.kudu.client.LocatedTablet.Replica;
+import org.apache.kudu.client.PartitionSchema;
 
 import java.io.IOException;
 import java.util.ArrayList;

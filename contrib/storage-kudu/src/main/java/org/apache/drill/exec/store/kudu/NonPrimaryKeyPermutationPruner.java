@@ -21,17 +21,17 @@ class NonPrimaryKeyPermutationPruner {
     }
     
     private Map<String, List<KuduPredicate>> toPredicatesByColumn(List<KuduPredicate> permutation) {
-      Map<String, List<KuduPredicate>> predicatesByColumn = new HashMap<>();
-      for (KuduPredicate pred : permutation) {
-        String column = pred.toPB().getColumn();
-        List<KuduPredicate> columnPredicates = predicatesByColumn.get(column);
-        if (columnPredicates == null) {
-          columnPredicates = new ArrayList<>();
-          predicatesByColumn.put(column, columnPredicates);
+        Map<String, List<KuduPredicate>> predicatesByColumn = new HashMap<>();
+        for (KuduPredicate pred : permutation) {
+            String column = pred.toPB().getColumn();
+            List<KuduPredicate> columnPredicates = predicatesByColumn.get(column);
+            if (columnPredicates == null) {
+                columnPredicates = new ArrayList<>();
+                predicatesByColumn.put(column, columnPredicates);
+            }
+            columnPredicates.add(pred);
         }
-        columnPredicates.add(pred);
-      }
-      return predicatesByColumn;
+        return predicatesByColumn;
     }
 
     private Set<KuduPredicate> findLinkedPrimaryKeyPart(List<KuduPredicate> permutation) {
@@ -53,35 +53,37 @@ class NonPrimaryKeyPermutationPruner {
     }
     
     private Map<Set<KuduPredicate>, List<Set<KuduPredicate>>> prepLinkedPrimaryKeyPartToRestMap(
-      List<List<KuduPredicate>> prunedPermutations) {
-      Map<Set<KuduPredicate>, List<Set<KuduPredicate>>> linkedPrimaryKeyPartToRest = new HashMap<>();
+        List<List<KuduPredicate>> prunedPermutations) {
+        Map<Set<KuduPredicate>, List<Set<KuduPredicate>>> linkedPrimaryKeyPartToRest = new HashMap<>();
 
-      for (List<KuduPredicate> permutation : permutationSet) {
-          // If KuduPredicate would implement Comparable then TreeSet could have been better a choice
-          Set<KuduPredicate> linkedPrimaryKeyPredicates;
-          Set<KuduPredicate> nonLinkedPredicates = new HashSet<>();
+        for (List<KuduPredicate> permutation : permutationSet) {
+            // If KuduPredicate would implement Comparable then TreeSet could
+            // have been better a choice
+            Set<KuduPredicate> linkedPrimaryKeyPredicates;
+            Set<KuduPredicate> nonLinkedPredicates = new HashSet<>();
 
-          linkedPrimaryKeyPredicates = findLinkedPrimaryKeyPart(permutation);
-          for (KuduPredicate pred : permutation) {
-              if (!linkedPrimaryKeyPredicates.contains(pred)) {
-                  nonLinkedPredicates.add(pred);
-              }
-          }
+            linkedPrimaryKeyPredicates = findLinkedPrimaryKeyPart(permutation);
+            for (KuduPredicate pred : permutation) {
+                if (!linkedPrimaryKeyPredicates.contains(pred)) {
+                    nonLinkedPredicates.add(pred);
+                }
+            }
 
-          if (nonLinkedPredicates.isEmpty()) {
-              // Just pass the current permutation - it's safe
-              prunedPermutations.add(permutation);
-          } else {
-              List<Set<KuduPredicate>> list = linkedPrimaryKeyPartToRest.get(linkedPrimaryKeyPredicates);
+            if (nonLinkedPredicates.isEmpty()) {
+                // Just pass the current permutation - it's safe
+                prunedPermutations.add(permutation);
+            } else {
+                List<Set<KuduPredicate>> list = linkedPrimaryKeyPartToRest
+                    .get(linkedPrimaryKeyPredicates);
 
-              if (list == null) {
-                  list = new ArrayList<>();
-                  linkedPrimaryKeyPartToRest.put(linkedPrimaryKeyPredicates, list);
-              }
-              list.add(nonLinkedPredicates);
-          }
-      }
-      return linkedPrimaryKeyPartToRest;
+                if (list == null) {
+                    list = new ArrayList<>();
+                    linkedPrimaryKeyPartToRest.put(linkedPrimaryKeyPredicates, list);
+                }
+                list.add(nonLinkedPredicates);
+            }
+        }
+        return linkedPrimaryKeyPartToRest;
     }
 
     public List<List<KuduPredicate>> pruneNonLinkedKeys() {

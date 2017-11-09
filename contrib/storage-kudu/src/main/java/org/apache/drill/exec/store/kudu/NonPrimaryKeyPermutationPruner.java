@@ -1,6 +1,14 @@
 package org.apache.drill.exec.store.kudu;
 
-import java.util.*;
+import java.util.List;
+import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Arrays;
 
 import org.apache.kudu.Common;
 import org.apache.kudu.client.KuduPredicate;
@@ -19,7 +27,7 @@ class NonPrimaryKeyPermutationPruner {
         this.kuduScanSpecOptimizer = kuduScanSpecOptimizer;
         this.permutationSet = permutationSet;
     }
-    
+
     private Map<String, List<KuduPredicate>> toPredicatesByColumn(List<KuduPredicate> permutation) {
         Map<String, List<KuduPredicate>> predicatesByColumn = new HashMap<>();
         for (KuduPredicate pred : permutation) {
@@ -51,7 +59,7 @@ class NonPrimaryKeyPermutationPruner {
 
         return linkedPart;
     }
-    
+
     private Map<Set<KuduPredicate>, List<Set<KuduPredicate>>> prepLinkedPrimaryKeyPartToRestMap(
         List<List<KuduPredicate>> prunedPermutations) {
         Map<Set<KuduPredicate>, List<Set<KuduPredicate>>> linkedPrimaryKeyPartToRest = new HashMap<>();

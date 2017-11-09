@@ -19,14 +19,19 @@ class NonPrimaryKeyPermutationPruner {
         this.kuduScanSpecOptimizer = kuduScanSpecOptimizer;
         this.permutationSet = permutationSet;
     }
+    
+    private Map<String, KuduPredicate> toPredicatesByColumn(List<KuduPredicate> permutation) {
+      Map<String, KuduPredicate> leftCols = new HashMap<>();
+      for (KuduPredicate pred : permutation) {
+          leftCols.put(pred.toPB().getColumn(), pred);
+      }
+      return leftCols;
+    }
 
     private Set<KuduPredicate> findLinkedPrimaryKeyPart(List<KuduPredicate> permutation) {
         Set<KuduPredicate> linkedPart = new HashSet<>();
 
-        Map<String, KuduPredicate> leftCols = new HashMap<>();
-        for (KuduPredicate pred : permutation) {
-            leftCols.put(pred.toPB().getColumn(), pred);
-        }
+        Map<String, KuduPredicate> leftCols = toPredicatesByColumn(permutation);
 
         for (String primaryKey : kuduScanSpecOptimizer.primaryKeys) {
             if (leftCols.keySet().contains(primaryKey)) {

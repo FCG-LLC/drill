@@ -40,37 +40,44 @@ class NonPrimaryKeyPermutationPruner {
 
         return linkedPart;
     }
+    
+    private Map<Set<KuduPredicate>, List<Set<KuduPredicate>>> prepLinkedPrimaryKeyPartToRestMap(
+      List<List<KuduPredicate>> prunedPermutations) {
+      Map<Set<KuduPredicate>, List<Set<KuduPredicate>>> linkedPrimaryKeyPartToRest = new HashMap<>();
+
+      for (List<KuduPredicate> permutation : permutationSet) {
+          // If KuduPredicate would implement Comparable then TreeSet could have been better a choice
+          Set<KuduPredicate> linkedPrimaryKeyPredicates;
+          Set<KuduPredicate> nonLinkedPredicates = new HashSet<>();
+
+          linkedPrimaryKeyPredicates = findLinkedPrimaryKeyPart(permutation);
+          for (KuduPredicate pred : permutation) {
+              if (!linkedPrimaryKeyPredicates.contains(pred)) {
+                  nonLinkedPredicates.add(pred);
+              }
+          }
+
+          if (nonLinkedPredicates.isEmpty()) {
+              // Just pass the current permutation - it's safe
+              prunedPermutations.add(permutation);
+          } else {
+              List<Set<KuduPredicate>> list = linkedPrimaryKeyPartToRest.get(linkedPrimaryKeyPredicates);
+
+              if (list == null) {
+                  list = new ArrayList<>();
+                  linkedPrimaryKeyPartToRest.put(linkedPrimaryKeyPredicates, list);
+              }
+              list.add(nonLinkedPredicates);
+          }
+      }
+      return linkedPrimaryKeyPartToRest;
+    }
 
     public List<List<KuduPredicate>> pruneNonLinkedKeys() {
         List<List<KuduPredicate>> prunedPermutations = new ArrayList<>();
 
-        Map<Set<KuduPredicate>, List<Set<KuduPredicate>>> linkedPrimaryKeyPartToRest = new HashMap<>();
-
-        for (List<KuduPredicate> permutation : permutationSet) {
-            // If KuduPredicate would implement Comparable then TreeSet could have been better a choice
-            Set<KuduPredicate> linkedPrimaryKeyPredicates;
-            Set<KuduPredicate> nonLinkedPredicates = new HashSet<>();
-
-            linkedPrimaryKeyPredicates = findLinkedPrimaryKeyPart(permutation);
-            for (KuduPredicate pred : permutation) {
-                if (!linkedPrimaryKeyPredicates.contains(pred)) {
-                    nonLinkedPredicates.add(pred);
-                }
-            }
-
-            if (nonLinkedPredicates.isEmpty()) {
-                // Just pass the current permutation - it's safe
-                prunedPermutations.add(permutation);
-            } else {
-                List<Set<KuduPredicate>> list = linkedPrimaryKeyPartToRest.get(linkedPrimaryKeyPredicates);
-
-                if (list == null) {
-                    list = new ArrayList<>();
-                    linkedPrimaryKeyPartToRest.put(linkedPrimaryKeyPredicates, list);
-                }
-                list.add(nonLinkedPredicates);
-            }
-        }
+        Map<Set<KuduPredicate>, List<Set<KuduPredicate>>> linkedPrimaryKeyPartToRest = prepLinkedPrimaryKeyPartToRestMap(
+          prunedPermutations);
 
         // For any permutation of concern, see how many filters are there
         for (Set<KuduPredicate> linkedKeyPart : linkedPrimaryKeyPartToRest.keySet()) {

@@ -20,23 +20,29 @@ class NonPrimaryKeyPermutationPruner {
         this.permutationSet = permutationSet;
     }
     
-    private Map<String, KuduPredicate> toPredicatesByColumn(List<KuduPredicate> permutation) {
-      Map<String, KuduPredicate> leftCols = new HashMap<>();
+    private Map<String, List<KuduPredicate>> toPredicatesByColumn(List<KuduPredicate> permutation) {
+      Map<String, List<KuduPredicate>> predicatesByColumn = new HashMap<>();
       for (KuduPredicate pred : permutation) {
-          leftCols.put(pred.toPB().getColumn(), pred);
+        String column = pred.toPB().getColumn();
+        List<KuduPredicate> columnPredicates = predicatesByColumn.get(column);
+        if (columnPredicates == null) {
+          columnPredicates = new ArrayList<>();
+          predicatesByColumn.put(column, columnPredicates);
+        }
+        columnPredicates.add(pred);
       }
-      return leftCols;
+      return predicatesByColumn;
     }
 
     private Set<KuduPredicate> findLinkedPrimaryKeyPart(List<KuduPredicate> permutation) {
         Set<KuduPredicate> linkedPart = new HashSet<>();
 
-        Map<String, KuduPredicate> leftCols = toPredicatesByColumn(permutation);
+        Map<String, List<KuduPredicate>> predicatesByColumn = toPredicatesByColumn(permutation);
 
         for (String primaryKey : kuduScanSpecOptimizer.primaryKeys) {
-            if (leftCols.keySet().contains(primaryKey)) {
+            if (predicatesByColumn.keySet().contains(primaryKey)) {
                 // Good, we have it, so far it's valid, lets move to the next...
-                linkedPart.add(leftCols.remove(primaryKey));
+                linkedPart.addAll(predicatesByColumn.remove(primaryKey));
             } else {
                 // We have a gap - whatever is left should not be included on any path within an OR query
                 return linkedPart;
@@ -81,8 +87,8 @@ class NonPrimaryKeyPermutationPruner {
     public List<List<KuduPredicate>> pruneNonLinkedKeys() {
         List<List<KuduPredicate>> prunedPermutations = new ArrayList<>();
 
-        Map<Set<KuduPredicate>, List<Set<KuduPredicate>>> linkedPrimaryKeyPartToRest = prepLinkedPrimaryKeyPartToRestMap(
-          prunedPermutations);
+        Map<Set<KuduPredicate>, List<Set<KuduPredicate>>> linkedPrimaryKeyPartToRest
+          = prepLinkedPrimaryKeyPartToRestMap(prunedPermutations);
 
         // For any permutation of concern, see how many filters are there
         for (Set<KuduPredicate> linkedKeyPart : linkedPrimaryKeyPartToRest.keySet()) {

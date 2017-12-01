@@ -137,7 +137,7 @@ public class KuduGroupScan extends AbstractGroupScan {
       logger.info("Generated scan spec: {}", pseudoScanSpec.toString());
 
       // Remove it
-      System.out.println("Generated scan spec: " + pseudoScanSpec.toString());
+      System.out.println("Generated scan spec:" + pseudoScanSpec.toString());
 
       for (KuduPredicate pred : predicateSet) {
         scanTokenBuilder.addPredicate(pred);
@@ -148,6 +148,8 @@ public class KuduGroupScan extends AbstractGroupScan {
       allScanTokens.addAll(scanTokenBuilder.build());
     }
 
+    logger.info("Generated {} scan tokens in total", allScanTokens.size());
+    System.out.println("Generated " + allScanTokens.size() + " scan tokens in total");
     return allScanTokens;
   }
 

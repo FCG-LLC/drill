@@ -30,46 +30,59 @@ public class KuduStoragePluginConfig extends StoragePluginConfigBase {
   public static final String NAME = "kudu";
 
   private final String masterAddresses;
+  private final long operationTimeoutMs;
+  private final int optimizerMaxNonPrimaryKeyAlternatives;
+  private final boolean allUnsignedINT8;
+  private final boolean allUnsignedINT16;
 
   @JsonCreator
-  public KuduStoragePluginConfig(@JsonProperty("masterAddresses") String masterAddresses) {
+  public KuduStoragePluginConfig(
+          @JsonProperty("masterAddresses") String masterAddresses,
+          @JsonProperty("operationTimeoutMs") long operationTimoutMs,
+          @JsonProperty("optimizerMaxNonPrimaryKeyAlternatives") int optimizerMaxNonPrimaryKeyAlternatives,
+          @JsonProperty("allUnsignedINT8") boolean allUnsignedINT8,
+          @JsonProperty("allUnsignedINT16") boolean allUnsignedINT16) {
     this.masterAddresses = masterAddresses;
+    this.operationTimeoutMs = operationTimoutMs;
+    this.optimizerMaxNonPrimaryKeyAlternatives = optimizerMaxNonPrimaryKeyAlternatives;
+    this.allUnsignedINT8 = allUnsignedINT8;
+    this.allUnsignedINT16 = allUnsignedINT16;
   }
 
   public String getMasterAddresses() {
     return masterAddresses;
   }
 
+  public long getOperationTimeoutMs() { return operationTimeoutMs; }
+
+  public int getOptimizerMaxNonPrimaryKeyAlternatives() { return optimizerMaxNonPrimaryKeyAlternatives; }
+
+  public boolean isAllUnsignedINT8() { return allUnsignedINT8; }
+
+  public boolean isAllUnsignedINT16() { return allUnsignedINT16; }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) { return true; }
+    if (o == null || getClass() != o.getClass()) { return false; }
+
+    KuduStoragePluginConfig that = (KuduStoragePluginConfig) o;
+
+    if (operationTimeoutMs != that.operationTimeoutMs) { return false; }
+    if (optimizerMaxNonPrimaryKeyAlternatives != that.optimizerMaxNonPrimaryKeyAlternatives) { return false; }
+    if (allUnsignedINT8 != that.allUnsignedINT8) { return false; }
+    if (allUnsignedINT16 != that.allUnsignedINT16) { return false; }
+
+    return masterAddresses != null ? masterAddresses.equals(that.masterAddresses) : that.masterAddresses == null;
+  }
+
   @Override
   public int hashCode() {
-    final int prime = 31;
-    int result = 1;
-    result = prime * result + ((masterAddresses == null) ? 0 : masterAddresses.hashCode());
+    int result = masterAddresses != null ? masterAddresses.hashCode() : 0;
+    result = 31 * result + (int) (operationTimeoutMs ^ (operationTimeoutMs >>> 32));
+    result = 31 * result + optimizerMaxNonPrimaryKeyAlternatives;
+    result = 31 * result + (allUnsignedINT8 ? 1 : 0);
+    result = 31 * result + (allUnsignedINT16 ? 1 : 0);
     return result;
   }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (this == obj) {
-      return true;
-    }
-    if (obj == null) {
-      return false;
-    }
-    if (getClass() != obj.getClass()) {
-      return false;
-    }
-    KuduStoragePluginConfig other = (KuduStoragePluginConfig) obj;
-    if (masterAddresses == null) {
-      if (other.masterAddresses != null) {
-        return false;
-      }
-    } else if (!masterAddresses.equals(other.masterAddresses)) {
-      return false;
-    }
-    return true;
-  }
-
-
-
 }

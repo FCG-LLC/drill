@@ -18,10 +18,8 @@
 package org.apache.drill.store.kudu;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
-import org.apache.drill.categories.KuduStorageTest;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.apache.kudu.ColumnSchema;
@@ -38,14 +36,12 @@ import org.apache.kudu.client.PartialRow;
 import org.apache.kudu.client.RowResult;
 import org.apache.kudu.client.RowResultIterator;
 import org.apache.kudu.client.SessionConfiguration;
-import org.junit.experimental.categories.Category;
 
-@Ignore("requires remote kudu server")
-@Category(KuduStorageTest.class)
+@Ignore
 public class TestKuduConnect {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestKuduConnect.class);
 
-  public static final String KUDU_MASTER = "172.31.1.99";
+  public static final String KUDU_MASTER = "localhost";
 
   public static void createKuduTable(String tableName, int tablets, int replicas, int rows) throws Exception {
 
@@ -67,7 +63,6 @@ public class TestKuduConnect {
 
       CreateTableOptions builder = new CreateTableOptions();
       builder.setNumReplicas(replicas);
-      builder.setRangePartitionColumns(Arrays.asList("key"));
       for (int i = 1; i < tablets; i++) {
         PartialRow splitRow = schema.newPartialRow();
         splitRow.addInt("key", i*1000);

@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.store.kudu;
 
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -38,6 +39,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
+import org.apache.kudu.client.ColumnRangePredicate;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduScanToken;
+import org.apache.kudu.client.KuduScanner;
 
 // Class containing information for reading a single Kudu tablet
 @JsonTypeName("kudu-tablet-scan")
@@ -50,26 +55,31 @@ public class KuduSubScan extends AbstractBase implements SubScan {
 
   private final KuduStoragePlugin kuduStoragePlugin;
   private final List<KuduSubScanSpec> tabletScanSpecList;
+  private final String tableName;
   private final List<SchemaPath> columns;
+
 
   @JsonCreator
   public KuduSubScan(@JacksonInject StoragePluginRegistry registry,
                       @JsonProperty("storage") StoragePluginConfig storage,
-      @JsonProperty("tabletScanSpecList") LinkedList<KuduSubScanSpec> tabletScanSpecList,
+                      @JsonProperty("tabletScanSpecList") LinkedList<KuduSubScanSpec> tabletScanSpecList,
+                      @JsonProperty("tableName") String tableName,
                       @JsonProperty("columns") List<SchemaPath> columns) throws ExecutionSetupException {
     super((String) null);
     kuduStoragePlugin = (KuduStoragePlugin) registry.getPlugin(storage);
     this.tabletScanSpecList = tabletScanSpecList;
     this.storage = (KuduStoragePluginConfig) storage;
+    this.tableName = tableName;
     this.columns = columns;
   }
 
   public KuduSubScan(KuduStoragePlugin plugin, KuduStoragePluginConfig config,
-      List<KuduSubScanSpec> tabletInfoList, List<SchemaPath> columns) {
+      List<KuduSubScanSpec> tabletInfoList, String tableName, List<SchemaPath> columns) {
     super((String) null);
     kuduStoragePlugin = plugin;
     storage = config;
     this.tabletScanSpecList = tabletInfoList;
+    this.tableName = tableName;
     this.columns = columns;
   }
 
@@ -101,10 +111,14 @@ public class KuduSubScan extends AbstractBase implements SubScan {
     return physicalVisitor.visitSubScan(this, value);
   }
 
+  public String getTableName() {
+    return tableName;
+  }
+
   @Override
   public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) {
     Preconditions.checkArgument(children.isEmpty());
-    return new KuduSubScan(kuduStoragePlugin, storage, tabletScanSpecList, columns);
+    return new KuduSubScan(kuduStoragePlugin, storage, tabletScanSpecList, tableName, columns);
   }
 
   @Override
@@ -115,30 +129,30 @@ public class KuduSubScan extends AbstractBase implements SubScan {
   public static class KuduSubScanSpec {
 
     private final String tableName;
-    private final byte[] startKey;
-    private final byte[] endKey;
+    private final byte[] serializedScanToken;
 
     @JsonCreator
     public KuduSubScanSpec(@JsonProperty("tableName") String tableName,
-                           @JsonProperty("startKey") byte[] startKey,
-                           @JsonProperty("endKey") byte[] endKey) {
+                           @JsonProperty("startKey") byte[] serializedScanToken) {
       this.tableName = tableName;
-      this.startKey = startKey;
-      this.endKey = endKey;
+      this.serializedScanToken = serializedScanToken;
     }
 
     public String getTableName() {
       return tableName;
     }
 
-    public byte[] getStartKey() {
-      return startKey;
+    public byte[] getSerializedScanToken() {
+      return serializedScanToken;
     }
 
-    public byte[] getEndKey() {
-      return endKey;
+    public KuduScanner deserializeIntoScanner(KuduClient client) throws IOException {
+      return KuduScanToken.deserializeIntoScanner(serializedScanToken, client);
     }
 
+    public String toString(KuduClient client) throws IOException {
+      return String.format("KuduSubScanSpec: {}, {}", getTableName(), KuduScanToken.stringifySerializedToken(serializedScanToken, client));
+    }
   }
 
   @Override

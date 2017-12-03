@@ -18,13 +18,10 @@
 package org.apache.drill.store.kudu;
 
 import org.apache.drill.test.BaseTestQuery;
-import org.apache.drill.categories.KuduStorageTest;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 
-@Ignore("requires a remote kudu server to run.")
-@Category(KuduStorageTest.class)
+@Ignore
 public class TestKuduPlugin extends BaseTestQuery {
 
   @Test

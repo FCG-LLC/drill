@@ -12,10 +12,10 @@ ENV LC_ALL en_US.UTF-8
 RUN apt-get update -y
 RUN apt-get upgrade -y
 RUN apt-get install wget -y
-RUN echo "deb http://10.12.1.225/public trusty main" >> /etc/apt/sources.list
-RUN wget http://10.12.1.225/public/cs-repo.key -O /tmp/cs-repo.key && apt-key add /tmp/cs-repo.key && rm -f /tmp/cs-repo.key
-RUN echo "deb http://10.12.1.225/public xenial $destEnv" >> /etc/apt/sources.list
-RUN printf "Package: * \nPin: release a=xenial, o=10.12.1.225 \nPin-Priority: 1600 \n" > /etc/apt/preferences
+RUN echo "deb http://aptly.cs.int/public trusty main" >> /etc/apt/sources.list
+RUN wget http://aptly.cs.int/public/cs-repo.key -O /tmp/cs-repo.key && apt-key add /tmp/cs-repo.key && rm -f /tmp/cs-repo.key
+RUN echo "deb http://aptly.cs.int/public xenial $destEnv" >> /etc/apt/sources.list
+RUN printf "Package: * \nPin: release a=xenial, o=aptly.cs.int \nPin-Priority: 1600 \n" > /etc/apt/preferences
 
 RUN apt-get install curl software-properties-common paxctl pax-utils -y
 RUN add-apt-repository ppa:webupd8team/java -y

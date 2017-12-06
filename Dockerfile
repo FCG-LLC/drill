@@ -14,9 +14,9 @@ RUN apt-get install -y \
 
 # Apache Kudu
 RUN cd /etc/apt/sources.list.d && \
-    echo "deb http://10.12.1.225/public xenial $destEnv" >> /etc/apt/sources.list && \
-    wget http://10.12.1.225/public/cs-repo.key -O /tmp/cs-repo.key && apt-key add /tmp/cs-repo.key && rm -f /tmp/cs-repo.key && \
-    printf "Package: * \nPin: release a=xenial, o=10.12.1.225 \nPin-Priority: 1600 \n" > /etc/apt/preferences && \
+    echo "deb http://aptly.cs.int/public xenial $destEnv" >> /etc/apt/sources.list && \
+    wget http://aptly.cs.int/public/cs-repo.key -O /tmp/cs-repo.key && apt-key add /tmp/cs-repo.key && rm -f /tmp/cs-repo.key && \
+    printf "Package: * \nPin: release a=xenial, o=aptly.cs.int \nPin-Priority: 1600 \n" > /etc/apt/preferences && \
     apt-get update && \
     apt-get -y dist-upgrade && \
     apt-get -y install kudu kudu-master kudu-tserver libkuduclient0 libkuduclient-dev

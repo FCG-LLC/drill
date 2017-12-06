@@ -27,11 +27,11 @@ import org.apache.drill.exec.record.VectorAccessible;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.Type;
+import org.apache.kudu.client.CreateTableOptions;
 import org.apache.kudu.client.Insert;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduSession;
 import org.apache.kudu.client.KuduTable;
-import org.apache.kudu.client.CreateTableOptions;
 import org.apache.kudu.client.OperationResponse;
 import org.apache.kudu.client.SessionConfiguration.FlushMode;
 
@@ -82,7 +82,9 @@ public class KuduRecordWriterImpl extends KuduRecordWriter {
           i++;
         }
         Schema kuduSchema = new Schema(columns);
-        table = client.createTable(name, kuduSchema, new CreateTableOptions());
+
+        CreateTableOptions options = new CreateTableOptions();
+        table = client.createTable(name, kuduSchema, options);
       }
     } catch (Exception e) {
       throw new IOException(e);
@@ -115,10 +117,10 @@ public class KuduRecordWriterImpl extends KuduRecordWriter {
       return Type.INT32;
     case TIMESTAMP:
       return Type.UNIXTIME_MICROS;
-    case VARCHAR:
-      return Type.STRING;
     case VARBINARY:
       return Type.BINARY;
+    case VARCHAR:
+      return Type.STRING;
     default:
       throw UserException
         .dataWriteError()
@@ -154,7 +156,7 @@ public class KuduRecordWriterImpl extends KuduRecordWriter {
 
   private void flush() throws IOException {
     try {
-      // context.getStats().startWait();
+      context.getStats().startWait();
       List<OperationResponse> responses = session.flush();
       for (OperationResponse response : responses) {
         if (response.hasRowError()) {
@@ -164,7 +166,7 @@ public class KuduRecordWriterImpl extends KuduRecordWriter {
     } catch (Exception e) {
       throw new IOException(e);
     } finally {
-      // context.getStats().stopWait();
+      context.getStats().stopWait();
     }
   }
 

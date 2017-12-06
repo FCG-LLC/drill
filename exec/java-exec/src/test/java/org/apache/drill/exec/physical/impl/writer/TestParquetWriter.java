@@ -744,9 +744,7 @@ public class TestParquetWriter extends BaseTestQuery {
   }
 
   /*
-    Impala encodes timestamp values as int96 fields. Test the reading of an int96 field with two converters:
-    the first one converts parquet INT96 into drill VARBINARY and the second one (works while
-    store.parquet.reader.int96_as_timestamp option is enabled) converts parquet INT96 into drill TIMESTAMP.
+  Test the reading of an int96 field. Impala encodes timestamps as int96 fields
    */
   @Test
   public void testImpalaParquetInt96() throws Exception {
@@ -763,7 +761,7 @@ public class TestParquetWriter extends BaseTestQuery {
   Test the reading of a binary field as drill varbinary where data is in dictionary _and_ non-dictionary encoded pages
    */
   @Test
-  public void testImpalaParquetBinaryAsVarBinary_DictChange() throws Exception {
+  public void testImpalaParquetVarBinary_DictChange() throws Exception {
     compareParquetReadersColumnar("field_impala_ts", "cp.`parquet/int96_dict_change.parquet`");
   }
 
@@ -794,24 +792,8 @@ public class TestParquetWriter extends BaseTestQuery {
      Test the conversion from int96 to impala timestamp
    */
   @Test
-  public void testTimestampImpalaConvertFrom() throws Exception {
+  public void testImpalaParquetTimestampAsInt96() throws Exception {
     compareParquetReadersColumnar("convert_from(field_impala_ts, 'TIMESTAMP_IMPALA')", "cp.`parquet/int96_impala_1.parquet`");
-  }
-
-  /*
-     Test reading parquet Int96 as TimeStamp and comparing obtained values with the
-     old results (reading the same values as VarBinary and convert_fromTIMESTAMP_IMPALA function using)
-   */
-  @Test
-  public void testImpalaParquetTimestampInt96AsTimeStamp() throws Exception {
-    try {
-      test("alter session set %s = false", ExecConstants.PARQUET_NEW_RECORD_READER);
-      compareParquetInt96Converters("field_impala_ts", "cp.`parquet/int96_impala_1.parquet`");
-      test("alter session set %s = true", ExecConstants.PARQUET_NEW_RECORD_READER);
-      compareParquetInt96Converters("field_impala_ts", "cp.`parquet/int96_impala_1.parquet`");
-    } finally {
-      test("alter session reset `%s`", ExecConstants.PARQUET_NEW_RECORD_READER);
-    }
   }
 
   /*

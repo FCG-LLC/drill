@@ -53,6 +53,8 @@
     <hbase.version>1.1.3</hbase.version>
     <fmpp.version>0.9.15</fmpp.version>
     <freemarker.version>2.3.21</freemarker.version>
+    <maven.build.timestamp.format>yyMMddHHmm</maven.build.timestamp.format>
+    <buildTimestamp>${maven.build.timestamp}</buildTimestamp>
   </properties>
 
   <scm>
@@ -176,67 +178,61 @@
   <build>
 
     <plugins>
-      <plugin>
-        <groupId>org.apache.rat</groupId>
-        <artifactId>apache-rat-plugin</artifactId>
-        <version>0.12</version>
-        <executions>
-          <execution>
-            <id>rat-checks</id>
-            <phase>validate</phase>
-            <goals>
-              <goal>check</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <excludeSubprojects>false</excludeSubprojects>
-          <excludes>
-            <exclude>**/*.log</exclude>
-            <exclude>**/*.css</exclude>
-            <exclude>**/*.js</exclude>
-            <exclude>**/*.md</exclude>
-            <exclude>**/*.eps</exclude>
-            <exclude>**/*.json</exclude>
-            <exclude>**/*.seq</exclude>
-            <exclude>**/*.parquet</exclude>
-            <exclude>**/*.sql</exclude>
-            <exclude>**/git.properties</exclude>
-            <exclude>**/*.csv</exclude>
-            <exclude>**/*.csvh</exclude>
-            <exclude>**/*.csvh-test</exclude>
-            <exclude>**/*.tsv</exclude>
-            <exclude>**/*.txt</exclude>
-            <exclude>**/*.ssv</exclude>
-            <exclude>**/drill-*.conf</exclude>
-            <exclude>**/.buildpath</exclude>
-            <exclude>**/*.proto</exclude>
-            <exclude>**/*.fmpp</exclude>
-            <exclude>**/target/**</exclude>
-            <exclude>**/*.iml</exclude>
-            <exclude>**/.idea/**</exclude>
-            <exclude>**/*.tdd</exclude>
-            <exclude>**/*.project</exclude>
-            <exclude>**/TAGS</exclude>
-            <exclude>**/*.checkstyle</exclude>
-            <exclude>**/.classpath</exclude>
-            <exclude>**/.settings/**</exclude>
-            <exclude>.*/**</exclude>
-            <exclude>**/*.patch</exclude>
-            <exclude>**/*.pb.cc</exclude>
-            <exclude>**/*.pb.h</exclude>
-            <exclude>**/*.linux</exclude>
-            <exclude>**/client/build/**</exclude>
-            <exclude>**/cmake_install.cmake</exclude>
-            <exclude>**/*.tbl</exclude>
-            <exclude>**/*.httpd</exclude>
-            <exclude>**/*.autotools</exclude>
-            <exclude>**/*.cproject</exclude>
-            <!-- TODO DRILL-4336: try to avoid the need to add this -->
-            <exclude>dependency-reduced-pom.xml</exclude>
-          </excludes>
-        </configuration>
-      </plugin>
+      <!--<plugin>-->
+        <!--<groupId>org.apache.rat</groupId>-->
+        <!--<artifactId>apache-rat-plugin</artifactId>-->
+        <!--<executions>-->
+          <!--<execution>-->
+            <!--<id>rat-checks</id>-->
+            <!--<phase>validate</phase>-->
+            <!--<goals>-->
+              <!--<goal>check</goal>-->
+            <!--</goals>-->
+          <!--</execution>-->
+        <!--</executions>-->
+        <!--<configuration>-->
+          <!--<excludeSubprojects>false</excludeSubprojects>-->
+          <!--<excludes>-->
+            <!--<exclude>**/*.log</exclude>-->
+            <!--<exclude>**/*.css</exclude>-->
+            <!--<exclude>**/*.js</exclude>-->
+            <!--<exclude>**/*.md</exclude>-->
+            <!--<exclude>**/*.eps</exclude>-->
+            <!--<exclude>**/*.json</exclude>-->
+            <!--<exclude>**/*.seq</exclude>-->
+            <!--<exclude>**/*.parquet</exclude>-->
+            <!--<exclude>**/*.sql</exclude>-->
+            <!--<exclude>**/git.properties</exclude>-->
+            <!--<exclude>**/*.csv</exclude>-->
+            <!--<exclude>**/*.csvh</exclude>-->
+            <!--<exclude>**/*.csvh-test</exclude>-->
+            <!--<exclude>**/*.tsv</exclude>-->
+            <!--<exclude>**/*.txt</exclude>-->
+            <!--<exclude>**/*.ssv</exclude>-->
+            <!--<exclude>**/drill-*.conf</exclude>-->
+            <!--<exclude>**/.buildpath</exclude>-->
+            <!--<exclude>**/*.proto</exclude>-->
+            <!--<exclude>**/*.fmpp</exclude>-->
+            <!--<exclude>**/target/**</exclude>-->
+            <!--<exclude>**/*.iml</exclude>-->
+            <!--<exclude>**/*.tdd</exclude>-->
+            <!--<exclude>**/*.project</exclude>-->
+            <!--<exclude>**/TAGS</exclude>-->
+            <!--<exclude>**/*.checkstyle</exclude>-->
+            <!--<exclude>**/.classpath</exclude>-->
+            <!--<exclude>**/.settings/**</exclude>-->
+            <!--<exclude>.*/**</exclude>-->
+            <!--<exclude>**/*.patch</exclude>-->
+            <!--<exclude>**/*.pb.cc</exclude>-->
+            <!--<exclude>**/*.pb.h</exclude>-->
+            <!--<exclude>**/*.linux</exclude>-->
+            <!--<exclude>**/client/build/**</exclude>-->
+            <!--<exclude>**/*.tbl</exclude>-->
+            <!--&lt;!&ndash; TODO DRILL-4336: try to avoid the need to add this &ndash;&gt;-->
+            <!--<exclude>dependency-reduced-pom.xml</exclude>-->
+          <!--</excludes>-->
+        <!--</configuration>-->
+      <!--</plugin>-->
 
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -311,8 +307,8 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
-          <source>1.7</source>
-          <target>1.7</target>
+          <source>1.8</source>
+          <target>1.8</target>
           <maxmem>2048m</maxmem>
           <useIncrementalCompilation>false</useIncrementalCompilation>
           <fork>true</fork>
@@ -334,7 +330,7 @@
                   <version>[3.0.4,4)</version>
                 </requireMavenVersion>
                 <requireJavaVersion>
-                  <version>[1.7,1.9)</version>
+                  <version>[1.8,1.9)</version>
                 </requireJavaVersion>
               </rules>
             </configuration>

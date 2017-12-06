@@ -204,6 +204,8 @@ public class TestBuilder {
    * @return this test builder
    */
 
+  // list of queries to run before the test query, can be used to set several options
+  // list takes the form of a semi-colon separated list
   public TestBuilder optionSettingQueriesForTestQuery(String queries) {
     testOptionSettingQueries = queries;
     return this;

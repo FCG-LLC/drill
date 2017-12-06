@@ -87,21 +87,21 @@ public class ParquetReaderUtility {
    * in the data pages themselves to see if they are likely corrupt.
    */
   public enum DateCorruptionStatus {
-    META_SHOWS_CORRUPTION {
+    META_SHOWS_CORRUPTION{
       @Override
-      public String toString() {
+      public String toString(){
         return "It is determined from metadata that the date values are definitely CORRUPT";
       }
     },
     META_SHOWS_NO_CORRUPTION {
       @Override
-      public String toString() {
+      public String toString(){
         return "It is determined from metadata that the date values are definitely CORRECT";
       }
     },
     META_UNCLEAR_TEST_VALUES {
       @Override
-      public String toString() {
+      public String toString(){
         return "Not enough info in metadata, parquet reader will test individual date values";
       }
     }
@@ -162,7 +162,7 @@ public class ParquetReaderUtility {
             OriginalType originalType = columnMetadata.getOriginalType();
             if (OriginalType.DATE.equals(originalType) && columnMetadata.hasSingleValue() &&
                 (Integer) columnMetadata.getMaxValue() > ParquetReaderUtility.DATE_CORRUPTION_THRESHOLD) {
-              int newMinMax = ParquetReaderUtility.autoCorrectCorruptedDate((Integer) columnMetadata.getMaxValue());
+              int newMinMax = ParquetReaderUtility.autoCorrectCorruptedDate((Integer)columnMetadata.getMaxValue());
               columnMetadata.setMax(newMinMax);
               columnMetadata.setMin(newMinMax);
             }

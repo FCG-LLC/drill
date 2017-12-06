@@ -47,6 +47,7 @@ import org.apache.parquet.io.api.Binary;
 import org.joda.time.DateTimeConstants;
 
 import io.netty.buffer.DrillBuf;
+
 import static org.apache.drill.exec.store.parquet.ParquetReaderUtility.NanoTimeUtils.getDateTimeValueFromBinary;
 
 public class NullableFixedByteAlignedReaders {

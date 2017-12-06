@@ -349,49 +349,14 @@
                   <goal>jdeb</goal>
                 </goals>
                 <configuration>
-                  <deb>target/drill-${project.version}.deb</deb>
+                  <deb>target/apache-drill-${project.version}-${maven.build.timestamp}.deb</deb>
                   <dataSet>
                     <data>
-                      <src>target/drill-${project.version}-bin/drill-${project.version}/lib</src>
+                      <src>target/apache-drill-${project.version}/apache-drill-${project.version}</src>
                       <type>directory</type>
                       <mapper>
                         <type>perm</type>
-                        <prefix>/opt/drill/lib/</prefix>
-                      </mapper>
-                    </data>
-                    <data>
-                      <src>target/drill-${project.version}-bin/drill-${project.version}/jars</src>
-                      <type>directory</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/drill/jars/</prefix>
-                      </mapper>
-                    </data>
-                    <data>
-                      <src>target/drill-${project.version}-bin/drill-${project.version}/bin</src>
-                      <type>directory</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/drill/bin/</prefix>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-                    <data>
-                      <src>target/drill-${project.version}-bin/drill-${project.version}/conf</src>
-                      <type>directory</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/etc/drill/conf</prefix>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-                    <data>
-                      <src>src/resources/drillbit</src>
-                      <dst>/etc/init.d/drillbit</dst>
-                      <type>file</type>
-                      <mapper>
-                        <type>perm</type>
-                        <filemode>755</filemode>
+                        <prefix>/opt/drill/</prefix>
                       </mapper>
                     </data>
                   </dataSet>

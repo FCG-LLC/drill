@@ -18,12 +18,16 @@
 package org.apache.drill.exec.store.kudu;
 
 import java.io.IOException;
+import java.util.Set;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.drill.common.JSONOptions;
+import org.apache.drill.exec.ops.OptimizerRulesContext;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.store.AbstractStoragePlugin;
 import org.apache.drill.exec.store.SchemaConfig;
+import org.apache.drill.exec.store.StoragePluginOptimizerRule;
 import org.apache.kudu.client.KuduClient;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -46,7 +50,11 @@ public class KuduStoragePlugin extends AbstractStoragePlugin {
     this.schemaFactory = new KuduSchemaFactory(this, name);
     this.engineConfig = configuration;
     this.name = name;
-    this.client = new KuduClient.KuduClientBuilder(configuration.getMasterAddresses()).build();
+    this.client = new KuduClient.KuduClientBuilder(configuration.getMasterAddresses())
+            .defaultAdminOperationTimeoutMs(configuration.getOperationTimeoutMs())
+            .defaultOperationTimeoutMs(configuration.getOperationTimeoutMs())
+            .defaultSocketReadTimeoutMs(configuration.getOperationTimeoutMs()/2)
+            .build();
   }
 
   @Override
@@ -93,4 +101,8 @@ public class KuduStoragePlugin extends AbstractStoragePlugin {
     return engineConfig;
   }
 
+  @Override
+  public Set<StoragePluginOptimizerRule> getPhysicalOptimizerRules(OptimizerRulesContext optimizerRulesContext) {
+    return ImmutableSet.of(KuduPushFilterIntoScan.FILTER_ON_SCAN, KuduPushFilterIntoScan.FILTER_ON_PROJECT);
+  }
 }

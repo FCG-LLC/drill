@@ -1,8 +1,8 @@
-Package: drill
-Version: 1.0-SNAPSHOT
+Package: apache-drill
+Version: [[project.version]]-[[buildTimestamp]]
 Section: misc
 Priority: optional
 Architecture: all
 Maintainer: name <>
-Description: Apache Drill
+Description: Apache Drill CS edition
 Distribution: development

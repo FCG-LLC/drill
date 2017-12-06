@@ -42,7 +42,7 @@ import org.apache.kudu.client.SessionConfiguration;
 public class TestKuduConnect {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestKuduConnect.class);
 
-  public static final String KUDU_MASTER = "172.31.1.99";
+  public static final String KUDU_MASTER = "localhost";
 
   public static void createKuduTable(String tableName, int tablets, int replicas, int rows) throws Exception {
 

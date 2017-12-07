@@ -136,9 +136,6 @@ public class KuduGroupScan extends AbstractGroupScan {
       KuduScanSpec pseudoScanSpec = new KuduScanSpec(getTableName(), predicateSet);
       logger.info("Generated scan spec: {}", pseudoScanSpec.toString());
 
-      // Remove it
-      System.out.println("Generated scan spec:" + pseudoScanSpec.toString());
-
       for (KuduPredicate pred : predicateSet) {
         scanTokenBuilder.addPredicate(pred);
       }
@@ -149,7 +146,6 @@ public class KuduGroupScan extends AbstractGroupScan {
     }
 
     logger.info("Generated {} scan tokens in total", allScanTokens.size());
-    System.out.println("Generated " + allScanTokens.size() + " scan tokens in total");
     return allScanTokens;
   }
 
@@ -293,8 +289,8 @@ public class KuduGroupScan extends AbstractGroupScan {
       return MIN_HASH_BUCKETS;
     }
     List<PartitionSchema.HashBucketSchema> hbSchema = table.getPartitionSchema().getHashBucketSchemas();
-    if (hbSchema.size() > 0) {
-      return Math.max(MIN_HASH_BUCKETS, hbSchema.iterator().next().getNumBuckets());
+    if (!hbSchema.isEmpty()) {
+      return Math.max(MIN_HASH_BUCKETS, hbSchema.get(0).getNumBuckets());
     } else {
       return MIN_HASH_BUCKETS;
     }

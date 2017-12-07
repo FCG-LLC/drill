@@ -174,23 +174,28 @@ public class KuduRecordReader extends AbstractRecordReader {
     }
 
     try {
+        context.getStats().startWait();
         if ((iterator != null && iterator.hasNext()) || scanner.hasMoreRows()) {
-          context.getStats().startWait();
 
           try {
             if (iterator == null || !iterator.hasNext()) {
               iterator = scanner.nextRows();
             }
 
+            context.getStats().stopWait();
+
+            context.getStats().startProcessing();
             for (; iterator.hasNext() && rowCount < MAXIMUM_ROWS_SUPPORTED_IN_BATCH; rowCount++) {
               addRowResult(iterator.next(), rowCount);
             }
           } finally {
-            context.getStats().stopWait();
+            context.getStats().stopProcessing();
           }
         }
     } catch (Exception ex) {
       throw new RuntimeException(ex);
+    } finally {
+      context.getStats().stopWait();
     }
 
     if (projectedCols == null) {

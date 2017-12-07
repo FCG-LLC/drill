@@ -91,13 +91,14 @@ public class TestWriteToDisk extends ExecTest {
         VectorContainer container = new VectorContainer();
         container.addCollection(vectorList);
         container.setRecordCount(4);
+        @SuppressWarnings("resource")
         WritableBatch batch = WritableBatch.getBatchNoHVWrap(
             container.getRecordCount(), container, false);
         VectorAccessibleSerializable wrap = new VectorAccessibleSerializable(
             batch, context.getAllocator());
 
         Configuration conf = new Configuration();
-        conf.set(FileSystem.FS_DEFAULT_NAME_KEY, "file:///");
+        conf.set(FileSystem.FS_DEFAULT_NAME_KEY, FileSystem.DEFAULT_FS);
 
         final VectorAccessibleSerializable newWrap = new VectorAccessibleSerializable(
             context.getAllocator());
@@ -107,7 +108,6 @@ public class TestWriteToDisk extends ExecTest {
           final Path path = new Path(tempDir.getAbsolutePath(), "drillSerializable");
           try (final FSDataOutputStream out = fs.create(path)) {
             wrap.writeToStream(out);
-            out.close();
           }
 
           try (final FSDataInputStream in = fs.open(path)) {

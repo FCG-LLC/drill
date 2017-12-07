@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -28,12 +28,17 @@ import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.UserBitShared.SerializedField;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.TransferPair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public abstract class BaseValueVector implements ValueVector {
-  private static final Logger logger = LoggerFactory.getLogger(BaseValueVector.class);
+//  private static final Logger logger = LoggerFactory.getLogger(BaseValueVector.class);
 
+  /**
+   * Physical maximum allocation. This is the value prior to Drill 1.11.
+   * This size causes memory fragmentation. Please use
+   * {@link ValueVector#MAX_BUFFER_SIZE} in new code.
+   */
+
+  @Deprecated
   public static final int MAX_ALLOCATION_SIZE = Integer.MAX_VALUE;
   public static final int INITIAL_VALUE_ALLOCATION = 4096;
 
@@ -101,7 +106,12 @@ public abstract class BaseValueVector implements ValueVector {
     public void generateTestData(int values) {}
 
     //TODO: consider making mutator stateless(if possible) on another issue.
+    @Override
     public void reset() {}
+
+    // TODO: If mutator becomes stateless, remove this method.
+    @Override
+    public void exchange(ValueVector.Mutator other) { }
   }
 
   @Override

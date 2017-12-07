@@ -18,6 +18,7 @@
 package org.apache.drill.store.kudu;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.junit.Ignore;
@@ -37,7 +38,7 @@ import org.apache.kudu.client.RowResult;
 import org.apache.kudu.client.RowResultIterator;
 import org.apache.kudu.client.SessionConfiguration;
 
-@Ignore
+@Ignore("requires remote kudu server")
 public class TestKuduConnect {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestKuduConnect.class);
 
@@ -63,6 +64,7 @@ public class TestKuduConnect {
 
       CreateTableOptions builder = new CreateTableOptions();
       builder.setNumReplicas(replicas);
+      builder.setRangePartitionColumns(Arrays.asList("key"));
       for (int i = 1; i < tablets; i++) {
         PartialRow splitRow = schema.newPartialRow();
         splitRow.addInt("key", i*1000);

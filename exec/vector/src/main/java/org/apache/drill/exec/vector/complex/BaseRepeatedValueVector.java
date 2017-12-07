@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -209,6 +209,23 @@ public abstract class BaseRepeatedValueVector extends BaseValueVector implements
     vector = v;
   }
 
+  @Override
+  public int getAllocatedByteCount() {
+    return offsets.getAllocatedByteCount() + vector.getAllocatedByteCount();
+  }
+
+  @Override
+  public int getPayloadByteCount() {
+    return offsets.getPayloadByteCount() + vector.getPayloadByteCount();
+  }
+
+  @Override
+  public void exchange(ValueVector other) {
+    BaseRepeatedValueVector target = (BaseRepeatedValueVector) other;
+    vector.exchange(target.vector);
+    offsets.exchange(target.offsets);
+  }
+
   public abstract class BaseRepeatedAccessor extends BaseValueVector.BaseAccessor implements RepeatedAccessor {
 
     @Override
@@ -248,6 +265,14 @@ public abstract class BaseRepeatedValueVector extends BaseValueVector implements
       setValueCount(index+1);
     }
 
+    public boolean startNewValueBounded(int index) {
+      if (index >= MAX_ROW_COUNT) {
+        return false;
+      }
+      startNewValue(index);
+      return true;
+    }
+
     @Override
     public void setValueCount(int valueCount) {
       // TODO: populate offset end points
@@ -255,6 +280,9 @@ public abstract class BaseRepeatedValueVector extends BaseValueVector implements
       final int childValueCount = valueCount == 0 ? 0 : offsets.getAccessor().get(valueCount);
       vector.getMutator().setValueCount(childValueCount);
     }
-  }
 
+    public int getInnerValueCountAt(int index) {
+      return offsets.getAccessor().get(index+1) - offsets.getAccessor().get(index);
+    }
+  }
 }

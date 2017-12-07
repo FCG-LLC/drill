@@ -56,8 +56,6 @@ public class DrillKuduTable extends DynamicDrillTable {
 
   private RelDataType getSqlTypeFromKuduType(RelDataTypeFactory typeFactory, Type type) {
     switch (type) {
-    case BINARY:
-      return typeFactory.createSqlType(SqlTypeName.VARBINARY, Integer.MAX_VALUE);
     case BOOL:
       return typeFactory.createSqlType(SqlTypeName.BOOLEAN);
     case DOUBLE:
@@ -74,6 +72,8 @@ public class DrillKuduTable extends DynamicDrillTable {
       return typeFactory.createSqlType(SqlTypeName.VARCHAR, Integer.MAX_VALUE);
     case UNIXTIME_MICROS:
       return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
+    case BINARY:
+      return typeFactory.createSqlType(SqlTypeName.VARBINARY, Integer.MAX_VALUE);
     default:
       throw new UnsupportedOperationException("Unsupported type.");
     }

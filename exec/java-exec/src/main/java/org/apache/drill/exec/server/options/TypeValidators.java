@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,9 +17,9 @@
  */
 package org.apache.drill.exec.server.options;
 
-import java.util.HashSet;
 import java.util.Set;
 
+import com.google.common.collect.Sets;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.exec.server.options.OptionValue.Kind;
 import org.apache.drill.exec.server.options.OptionValue.OptionType;
@@ -37,7 +37,7 @@ public class TypeValidators {
     }
 
     @Override
-    public void validate(final OptionValue v, final OptionManager manager) {
+    public void validate(final OptionValue v, final OptionSet manager) {
       super.validate(v, manager);
       if (v.num_val > max || v.num_val < 1) {
         throw UserException.validationError()
@@ -54,7 +54,7 @@ public class TypeValidators {
     }
 
     @Override
-    public void validate(final OptionValue v, final OptionManager manager) {
+    public void validate(final OptionValue v, final OptionSet manager) {
       super.validate(v, manager);
       if (!isPowerOfTwo(v.num_val)) {
         throw UserException.validationError()
@@ -79,7 +79,7 @@ public class TypeValidators {
     }
 
     @Override
-    public void validate(final OptionValue v, final OptionManager manager) {
+    public void validate(final OptionValue v, final OptionSet manager) {
       super.validate(v, manager);
       if (v.float_val > max || v.float_val < min) {
         throw UserException.validationError()
@@ -90,19 +90,15 @@ public class TypeValidators {
   }
 
   public static class MinRangeDoubleValidator extends RangeDoubleValidator {
-    private final double min;
-    private final double max;
     private final String maxValidatorName;
 
     public MinRangeDoubleValidator(String name, double min, double max, double def, String maxValidatorName) {
       super(name, min, max, def);
-      this.min = min;
-      this.max = max;
       this.maxValidatorName = maxValidatorName;
     }
 
     @Override
-    public void validate(final OptionValue v, final OptionManager manager) {
+    public void validate(final OptionValue v, final OptionSet manager) {
       super.validate(v, manager);
       OptionValue maxValue = manager.getOption(maxValidatorName);
       if (v.float_val > maxValue.float_val) {
@@ -115,19 +111,15 @@ public class TypeValidators {
   }
 
   public static class MaxRangeDoubleValidator extends RangeDoubleValidator {
-    private final double min;
-    private final double max;
     private final String minValidatorName;
 
     public MaxRangeDoubleValidator(String name, double min, double max, double def, String minValidatorName) {
       super(name, min, max, def);
-      this.min = min;
-      this.max = max;
       this.minValidatorName = minValidatorName;
     }
 
     @Override
-    public void validate(final OptionValue v, final OptionManager manager) {
+    public void validate(final OptionValue v, final OptionSet manager) {
       super.validate(v, manager);
       OptionValue minValue = manager.getOption(minValidatorName);
       if (v.float_val < minValue.float_val) {
@@ -190,7 +182,7 @@ public class TypeValidators {
     }
 
     @Override
-    public void validate(final OptionValue v, final OptionManager manager) {
+    public void validate(final OptionValue v, final OptionSet manager) {
       super.validate(v, manager);
       if (v.num_val > max || v.num_val < min) {
         throw UserException.validationError()
@@ -204,17 +196,18 @@ public class TypeValidators {
    * Validator that checks if the given value is included in a list of acceptable values. Case insensitive.
    */
   public static class EnumeratedStringValidator extends StringValidator {
-    private final Set<String> valuesSet = new HashSet<>();
+    private final Set<String> valuesSet = Sets.newLinkedHashSet();
 
     public EnumeratedStringValidator(String name, String def, String... values) {
       super(name, def);
+      valuesSet.add(def.toLowerCase());
       for (String value : values) {
         valuesSet.add(value.toLowerCase());
       }
     }
 
     @Override
-    public void validate(final OptionValue v, final OptionManager manager) {
+    public void validate(final OptionValue v, final OptionSet manager) {
       super.validate(v, manager);
       if (!valuesSet.contains(v.string_val.toLowerCase())) {
         throw UserException.validationError()
@@ -245,7 +238,7 @@ public class TypeValidators {
     }
 
     @Override
-    public void validate(final OptionValue v, final OptionManager manager) {
+    public void validate(final OptionValue v, final OptionSet manager) {
       if (v.kind != kind) {
         throw UserException.validationError()
             .message(String.format("Option %s must be of type %s but you tried to set to %s.", getOptionName(),
@@ -257,6 +250,11 @@ public class TypeValidators {
             .message("Admin related settings can only be set at SYSTEM level scope. Given scope '%s'.", v.type)
             .build(logger);
       }
+    }
+
+    @Override
+    public Kind getKind() {
+      return kind;
     }
   }
 }

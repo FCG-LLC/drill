@@ -260,7 +260,8 @@ fi
 # Add $DRILL_HOME/conf if the user has provided their own
 # site configuration directory.
 # Ensures we pick up the default logback.xml, etc. if the
-# user does not provide their own.
+# user does not provide their own, and that we pick up the
+# drill-distrib.conf file, if provided by the distro.
 # Also, set a variable to remember that the config dir
 # is non-default, which is needed later.
 
@@ -347,10 +348,17 @@ case "`uname`" in
 CYGWIN*) is_cygwin=true;;
 esac
 
+if $is_cygwin; then
+  JAVA_BIN="java.exe"
+else
+  JAVA_BIN="java"
+fi
+
 # Test for or find JAVA_HOME
+
 if [ -z "$JAVA_HOME" ]; then
-  if [ -e `which java` ]; then
-    SOURCE=`which java`
+  SOURCE=`which java`
+  if [ -e $SOURCE ]; then
     while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
       DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
       SOURCE="$(readlink "$SOURCE")"
@@ -359,6 +367,7 @@ if [ -z "$JAVA_HOME" ]; then
       [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
     done
     JAVA_HOME="$( cd -P "$( dirname "$SOURCE" )" && cd .. && pwd )"
+    JAVA=$SOURCE
   fi
   # if we didn't set it
   if [ -z "$JAVA_HOME" ]; then
@@ -367,12 +376,18 @@ if [ -z "$JAVA_HOME" ]; then
 fi
 
 # Now, verify that 'java' binary exists and is suitable for Drill.
-if $is_cygwin; then
-  JAVA_BIN="java.exe"
-else
-  JAVA_BIN="java"
+# If we started with `which java` above, use that path (after replacing
+# symlinks.) If we started with JAVA_HOME, try in bin. Doing so handles
+# the case in which JAVA_HOME is a JDK that has a nested JRE; we prefer
+# the JDK bin. Finally, if nothing else works, just search for the
+# executable.
+
+if [ -z "$JAVA" ]; then
+  JAVA="$JAVA_HOME/bin/$JAVA_BIN"
+  if [[ ! -e $JAVA ]]; then
+    JAVA=`find -L "$JAVA_HOME" -name $JAVA_BIN -type f | head -n 1`
+  fi
 fi
-JAVA=`find -L "$JAVA_HOME" -name $JAVA_BIN -type f | head -n 1`
 if [ ! -e "$JAVA" ]; then
   fatal_error "Java not found at JAVA_HOME=$JAVA_HOME."
 fi

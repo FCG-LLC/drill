@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -31,7 +31,7 @@ import org.junit.Test;
 import java.util.List;
 
 public class TestUnionAll extends BaseTestQuery{
-  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestUnionAll.class);
+//  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestUnionAll.class);
 
   private static final String sliceTargetSmall = "alter session set `planner.slice_target` = 1";
   private static final String sliceTargetDefault = "alter session reset `planner.slice_target`";
@@ -1031,7 +1031,6 @@ public class TestUnionAll extends BaseTestQuery{
 
     // Validate the plan
     final String[] expectedPlan = {"UnionExchange.*\n",
-        ".*Project.*\n" +
         ".*UnionAll"};
     final String[] excludedPlan = {};
 
@@ -1178,6 +1177,17 @@ public class TestUnionAll extends BaseTestQuery{
       test(sliceTargetDefault);
       test(defaultDistribute);
     }
+  }
+
+  @Test // DRILL-5130
+  public void testUnionAllWithValues() throws Exception {
+    testBuilder()
+        .sqlQuery("values('A') union all values('B')")
+        .unOrdered()
+        .baselineColumns("EXPR$0")
+        .baselineValues("A")
+        .baselineValues("B")
+        .go();
   }
 
 }

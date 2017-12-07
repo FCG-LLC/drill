@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -34,7 +34,6 @@ import org.apache.drill.exec.compile.sig.MappingSet;
 import org.apache.drill.exec.exception.ClassTransformationException;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.expr.ClassGenerator;
-import org.apache.drill.exec.expr.ClassGenerator.HoldingContainer;
 import org.apache.drill.exec.expr.CodeGenerator;
 import org.apache.drill.exec.expr.ExpressionTreeMaterializer;
 import org.apache.drill.exec.expr.TypeHelper;
@@ -46,6 +45,7 @@ import org.apache.drill.exec.physical.impl.common.Comparator;
 import org.apache.drill.exec.physical.impl.common.HashTable;
 import org.apache.drill.exec.physical.impl.common.HashTableConfig;
 import org.apache.drill.exec.record.AbstractRecordBatch;
+import org.apache.drill.exec.record.BatchSchema;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.RecordBatch;
@@ -63,11 +63,13 @@ public class HashAggBatch extends AbstractRecordBatch<HashAggregate> {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(HashAggBatch.class);
 
   private HashAggregator aggregator;
-  private final RecordBatch incoming;
+  private RecordBatch incoming;
   private LogicalExpression[] aggrExprs;
   private TypedFieldId[] groupByOutFieldIds;
   private TypedFieldId[] aggrOutFieldIds;      // field ids for the outgoing batch
   private final List<Comparator> comparators;
+  private BatchSchema incomingSchema;
+  private boolean wasKilled;
 
   private final GeneratorMapping UPDATE_AGGR_INSIDE =
       GeneratorMapping.create("setupInterior" /* setup method */, "updateAggrValuesInternal" /* eval method */,
@@ -86,6 +88,7 @@ public class HashAggBatch extends AbstractRecordBatch<HashAggregate> {
   public HashAggBatch(HashAggregate popConfig, RecordBatch incoming, FragmentContext context) throws ExecutionSetupException {
     super(popConfig, context);
     this.incoming = incoming;
+    wasKilled = false;
 
     final int numGrpByExprs = popConfig.getGroupByExprs().size();
     comparators = Lists.newArrayListWithExpectedSize(numGrpByExprs);
@@ -119,10 +122,11 @@ public class HashAggBatch extends AbstractRecordBatch<HashAggregate> {
         return;
     }
 
+    this.incomingSchema = incoming.getSchema();
     if (!createAggregator()) {
       state = BatchState.DONE;
     }
-    for (VectorWrapper w : container) {
+    for (VectorWrapper<?> w : container) {
       AllocationHelper.allocatePrecomputedChildCount(w.getValueVector(), 0, 0, 0);
     }
   }
@@ -134,15 +138,36 @@ public class HashAggBatch extends AbstractRecordBatch<HashAggregate> {
       return IterOutcome.NONE;
     }
 
-    if (aggregator.buildComplete() && !aggregator.allFlushed()) {
-      // aggregation is complete and not all records have been output yet
-      return aggregator.outputCurrentBatch();
+    // if aggregation is complete and not all records have been output yet
+    if (aggregator.buildComplete() ||
+        // or: 1st phase need to return (not fully grouped) partial output due to memory pressure
+        aggregator.earlyOutput()) {
+      // then output the next batch downstream
+      HashAggregator.AggIterOutcome aggOut = aggregator.outputCurrentBatch();
+      // if Batch returned, or end of data - then return the appropriate iter outcome
+      if ( aggOut == HashAggregator.AggIterOutcome.AGG_NONE ) { return IterOutcome.NONE; }
+      if ( aggOut == HashAggregator.AggIterOutcome.AGG_OK ) { return IterOutcome.OK; }
+      // if RESTART - continue below with doWork() - read some spilled partition, just like reading incoming
+      incoming = aggregator.getNewIncoming(); // Restart - incoming was just changed
     }
 
-    logger.debug("Starting aggregator doWork; incoming record count = {} ", incoming.getRecordCount());
+    if (wasKilled) { // if kill() was called before, then finish up
+      aggregator.cleanup();
+      incoming.kill(false);
+      return IterOutcome.NONE;
+    }
 
-    AggOutcome out = aggregator.doWork();
-    logger.debug("Aggregator response {}, records {}", out, aggregator.getOutputCount());
+    // Read and aggregate records
+    // ( may need to run again if the spilled partition that was read
+    //   generated new partitions that were all spilled )
+    AggOutcome out;
+    do {
+      //
+      //  Read incoming batches and process their records
+      //
+      out = aggregator.doWork();
+    } while (out == AggOutcome.CALL_WORK_AGAIN);
+
     switch (out) {
     case CLEANUP_AND_RETURN:
       container.zeroVectors();
@@ -151,9 +176,14 @@ public class HashAggBatch extends AbstractRecordBatch<HashAggregate> {
       // fall through
     case RETURN_OUTCOME:
       return aggregator.getOutcome();
+
     case UPDATE_AGGREGATOR:
       context.fail(UserException.unsupportedError()
-        .message("Hash aggregate does not support schema changes").build(logger));
+          .message(SchemaChangeException.schemaChanged(
+              "Hash aggregate does not support schema change",
+              incomingSchema,
+              incoming.getSchema()).getMessage())
+          .build(logger));
       close();
       killIncoming(false);
       return IterOutcome.STOP;
@@ -169,7 +199,6 @@ public class HashAggBatch extends AbstractRecordBatch<HashAggregate> {
    * @return true if the aggregator was setup successfully. false if there was a failure.
    */
   private boolean createAggregator() {
-    logger.debug("Creating new aggregator.");
     try {
       stats.startSetup();
       this.aggregator = createAggregatorInternal();
@@ -190,6 +219,9 @@ public class HashAggBatch extends AbstractRecordBatch<HashAggregate> {
         CodeGenerator.get(HashAggregator.TEMPLATE_DEFINITION, context.getFunctionRegistry(), context.getOptions());
     ClassGenerator<HashAggregator> cg = top.getRoot();
     ClassGenerator<HashAggregator> cgInner = cg.getInnerGenerator("BatchHolder");
+    top.plainJavaCapable(true);
+    // Uncomment out this line to debug the generated code.
+    // top.saveCodeForDebugging(true);
 
     container.clear();
 
@@ -212,6 +244,7 @@ public class HashAggBatch extends AbstractRecordBatch<HashAggregate> {
       }
 
       final MaterializedField outputField = MaterializedField.create(ne.getRef().getAsNamePart().getName(), expr.getMajorType());
+      @SuppressWarnings("resource")
       ValueVector vv = TypeHelper.getNewVector(outputField, oContext.getAllocator());
 
       // add this group-by vector to the output container
@@ -236,6 +269,7 @@ public class HashAggBatch extends AbstractRecordBatch<HashAggregate> {
       }
 
       final MaterializedField outputField = MaterializedField.create(ne.getRef().getAsNamePart().getName(), expr.getMajorType());
+      @SuppressWarnings("resource")
       ValueVector vv = TypeHelper.getNewVector(outputField, oContext.getAllocator());
       aggrOutFieldIds[i] = container.add(vv);
 
@@ -255,7 +289,7 @@ public class HashAggBatch extends AbstractRecordBatch<HashAggregate> {
             HashTable.DEFAULT_LOAD_FACTOR, popConfig.getGroupByExprs(), null /* no probe exprs */, comparators);
 
     agg.setup(popConfig, htConfig, context, this.stats,
-        oContext.getAllocator(), incoming, this,
+        oContext, incoming, this,
         aggrExprs,
         cgInner.getWorkspaceTypes(),
         groupByOutFieldIds,
@@ -268,7 +302,7 @@ public class HashAggBatch extends AbstractRecordBatch<HashAggregate> {
     cg.setMappingSet(UpdateAggrValuesMapping);
 
     for (LogicalExpression aggr : aggrExprs) {
-      HoldingContainer hc = cg.addExpr(aggr, ClassGenerator.BlkCreateMode.TRUE);
+      cg.addExpr(aggr, ClassGenerator.BlkCreateMode.TRUE);
     }
   }
 
@@ -290,9 +324,7 @@ public class HashAggBatch extends AbstractRecordBatch<HashAggregate> {
       cg.getBlock("getVectorIndex")._return(var.invoke("getIndex").arg(JExpr.direct("recordIndex")));
       return;
     }
-
     }
-
   }
 
   @Override
@@ -305,7 +337,7 @@ public class HashAggBatch extends AbstractRecordBatch<HashAggregate> {
 
   @Override
   protected void killIncoming(boolean sendUpstream) {
+    wasKilled = true;
     incoming.kill(sendUpstream);
   }
-
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -90,6 +90,11 @@ public class MapVector extends AbstractMapVector {
   }
 
   @Override
+  public void copyEntry(int toIndex, ValueVector from, int fromIndex) {
+    copyFromSafe(fromIndex, toIndex, (MapVector) from);
+  }
+
+  @Override
   protected boolean supportsDirectRead() {
     return true;
   }
@@ -134,10 +139,9 @@ public class MapVector extends AbstractMapVector {
 
   @Override
   public DrillBuf[] getBuffers(boolean clear) {
-    int expectedSize = getBufferSize();
-    int actualSize   = super.getBufferSize();
-
-    Preconditions.checkArgument(expectedSize == actualSize);
+    //int expectedSize = getBufferSize();
+    //int actualSize   = super.getBufferSize();
+    //Preconditions.checkArgument(expectedSize == actualSize);
     return super.getBuffers(clear);
   }
 
@@ -278,7 +282,10 @@ public class MapVector extends AbstractMapVector {
       bufOffset += child.getBufferLength();
     }
 
-    assert bufOffset == buf.capacity();
+    // We should have consumed all bytes written into the buffer
+    // during deserialization.
+
+    assert bufOffset == buf.writerIndex();
   }
 
   @Override
@@ -298,6 +305,13 @@ public class MapVector extends AbstractMapVector {
   @Override
   public Mutator getMutator() {
     return mutator;
+  }
+
+  @Override
+  public void exchange(ValueVector other) {
+    // Exchange is used for look-ahead writers, but writers manage
+    // map member vectors directly.
+    throw new UnsupportedOperationException("Exchange() not supported for maps");
   }
 
   public class Accessor extends BaseValueVector.BaseAccessor {

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -52,7 +52,7 @@ public class ExecTest extends DrillTest {
     GuavaPatcher.patch();
   }
 
-  private static final DrillConfig c = DrillConfig.create();
+  protected static final DrillConfig c = DrillConfig.create();
 
   @After
   public void clear(){

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -30,10 +30,13 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.drill.DrillTestWrapper.TestServices;
 import org.apache.drill.common.config.DrillConfig;
+import org.apache.drill.common.config.DrillProperties;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.scanner.ClassPathScanner;
 import org.apache.drill.common.scanner.persistence.ScanResult;
+import org.apache.drill.common.util.TestTools;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.ExecTest;
 import org.apache.drill.exec.client.DrillClient;
@@ -50,13 +53,16 @@ import org.apache.drill.exec.rpc.ConnectionThrottle;
 import org.apache.drill.exec.rpc.user.AwaitableUserResultsListener;
 import org.apache.drill.exec.rpc.user.QueryDataBatch;
 import org.apache.drill.exec.rpc.user.UserResultsListener;
-import org.apache.drill.exec.rpc.user.UserSession;
 import org.apache.drill.exec.server.Drillbit;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.server.RemoteServiceSet;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.util.TestUtilities;
 import org.apache.drill.exec.util.VectorUtil;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.rules.TestRule;
@@ -68,15 +74,17 @@ import com.google.common.base.Preconditions;
 import com.google.common.io.Resources;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.drill.exec.vector.ValueVector;
 
 public class BaseTestQuery extends ExecTest {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(BaseTestQuery.class);
 
-  protected static final String TEMP_SCHEMA = "dfs_test.tmp";
+  public static final String TEMP_SCHEMA = "dfs_test.tmp";
 
-  private static final String ENABLE_FULL_CACHE = "drill.exec.test.use-full-cache";
   private static final int MAX_WIDTH_PER_NODE = 2;
 
   @SuppressWarnings("serial")
@@ -120,6 +128,8 @@ public class BaseTestQuery extends ExecTest {
 
   private static ScanResult classpathScan;
 
+  private static FileSystem fs;
+
   @BeforeClass
   public static void setupDefaultTestCluster() throws Exception {
     config = DrillConfig.create(TEST_CONFIGURATIONS);
@@ -128,9 +138,16 @@ public class BaseTestQuery extends ExecTest {
     // turns on the verbose errors in tests
     // sever side stacktraces are added to the message before sending back to the client
     test("ALTER SESSION SET `exec.errors.verbose` = true");
+    Configuration conf = new Configuration();
+    conf.set(FileSystem.FS_DEFAULT_NAME_KEY, FileSystem.DEFAULT_FS);
+    fs = FileSystem.get(conf);
   }
 
   protected static void updateTestCluster(int newDrillbitCount, DrillConfig newConfig) {
+    updateTestCluster(newDrillbitCount, newConfig, null);
+  }
+
+  protected static void updateTestCluster(int newDrillbitCount, DrillConfig newConfig, Properties properties) {
     Preconditions.checkArgument(newDrillbitCount > 0, "Number of Drillbits must be at least one");
     if (drillbitCount != newDrillbitCount || config != null) {
       // TODO: Currently we have to shutdown the existing Drillbit cluster before starting a new one with the given
@@ -143,7 +160,7 @@ public class BaseTestQuery extends ExecTest {
           // of the @BeforeClass method of test class.
           config = newConfig;
         }
-        openClient();
+        openClient(properties);
       } catch(Exception e) {
         throw new RuntimeException("Failure while updating the test Drillbit cluster.", e);
       }
@@ -179,12 +196,12 @@ public class BaseTestQuery extends ExecTest {
   }
 
   private static void openClient() throws Exception {
+    openClient(null);
+  }
+
+  private static void openClient(Properties properties) throws Exception {
     allocator = RootAllocatorFactory.newRoot(config);
-    if (config.hasPath(ENABLE_FULL_CACHE) && config.getBoolean(ENABLE_FULL_CACHE)) {
-      serviceSet = RemoteServiceSet.getServiceSetWithFullCache(config, allocator);
-    } else {
-      serviceSet = RemoteServiceSet.getLocalServiceSet();
-    }
+    serviceSet = RemoteServiceSet.getLocalServiceSet();
 
     dfsTestTmpSchemaLocation = TestUtilities.createTempDir();
 
@@ -198,7 +215,7 @@ public class BaseTestQuery extends ExecTest {
       TestUtilities.makeDfsTmpSchemaImmutable(pluginRegistry);
     }
 
-    client = QueryTestUtil.createClient(config,  serviceSet, MAX_WIDTH_PER_NODE, null);
+    client = QueryTestUtil.createClient(config,  serviceSet, MAX_WIDTH_PER_NODE, properties);
   }
 
   /**
@@ -233,9 +250,9 @@ public class BaseTestQuery extends ExecTest {
    */
   public static void updateClient(final String user, final String password) throws Exception {
     final Properties props = new Properties();
-    props.setProperty(UserSession.USER, user);
+    props.setProperty(DrillProperties.USER, user);
     if (password != null) {
-      props.setProperty(UserSession.PASSWORD, password);
+      props.setProperty(DrillProperties.PASSWORD, password);
     }
     updateClient(props);
   }
@@ -248,8 +265,26 @@ public class BaseTestQuery extends ExecTest {
     return testBuilder();
   }
 
+
+  public static class ClassicTestServices implements TestServices {
+    @Override
+    public BufferAllocator allocator() {
+      return allocator;
+    }
+
+    @Override
+    public void test(String query) throws Exception {
+      BaseTestQuery.test(query);
+    }
+
+    @Override
+    public List<QueryDataBatch> testRunAndReturn(final QueryType type, final Object query) throws Exception {
+      return BaseTestQuery.testRunAndReturn(type, query);
+    }
+  }
+
   public static TestBuilder testBuilder() {
-    return new TestBuilder(allocator);
+    return new TestBuilder(new ClassicTestServices());
   }
 
   @AfterClass
@@ -307,7 +342,7 @@ public class BaseTestQuery extends ExecTest {
       Preconditions.checkArgument(query instanceof String, "Expected a string as input query");
       query = QueryTestUtil.normalizeQuery((String)query);
       return client.runQuery(type, (String)query);
-  }
+    }
   }
 
   public static List<QueryDataBatch> testPreparedStatement(PreparedStatementHandle handle) throws Exception {
@@ -571,4 +606,49 @@ public class BaseTestQuery extends ExecTest {
       }
     }
   }
+
+  private static String replaceWorkingPathInString(String orig) {
+    return orig.replaceAll(Pattern.quote("[WORKING_PATH]"), Matcher.quoteReplacement(TestTools.getWorkingPath()));
+  }
+
+  protected static void copyDirectoryIntoTempSpace(String resourcesDir) throws IOException {
+    copyDirectoryIntoTempSpace(resourcesDir, null);
+  }
+
+  protected static void copyDirectoryIntoTempSpace(String resourcesDir, String destinationSubDir) throws IOException {
+    Path destination = destinationSubDir != null ? new Path(getDfsTestTmpSchemaLocation(), destinationSubDir)
+        : new Path(getDfsTestTmpSchemaLocation());
+    fs.copyFromLocalFile(
+        new Path(replaceWorkingPathInString(resourcesDir)),
+        destination);
+  }
+
+  /**
+   * Old metadata cache files include full paths to the files that have been scanned.
+   * <p>
+   * There is no way to generate a metadata cache file with absolute paths that
+   * will be guaranteed to be available on an arbitrary test machine.
+   * <p>
+   * To enable testing older metadata cache files, they were generated manually
+   * using older drill versions, and the absolute path up to the folder where
+   * the metadata cache file appeared was manually replaced with the string
+   * REPLACED_IN_TEST. Here the file is re-written into the given temporary
+   * location after the REPLACED_IN_TEST string has been replaced by the actual
+   * location generated during this run of the tests.
+   *
+   * @param srcFileOnClassPath the source path of metadata cache file, which should be replaced
+   * @param destFolderInTmp  the parent folder name of the metadata cache file
+   * @param metaFileName the name of metadata cache file depending on the type of the metadata
+   * @throws IOException if a create or write errors occur
+   */
+  protected static void copyMetaDataCacheToTempReplacingInternalPaths(String srcFileOnClassPath, String destFolderInTmp,
+      String metaFileName) throws IOException {
+    String metadataFileContents = getFile(srcFileOnClassPath);
+    Path rootMeta = new Path(dfsTestTmpSchemaLocation, destFolderInTmp);
+    Path newMetaCache = new Path(rootMeta, metaFileName);
+    FSDataOutputStream outSteam = fs.create(newMetaCache);
+    outSteam.writeBytes(metadataFileContents.replace("REPLACED_IN_TEST", dfsTestTmpSchemaLocation));
+    outSteam.close();
+  }
+
  }

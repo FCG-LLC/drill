@@ -1,5 +1,4 @@
-/*******************************************************************************
-
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -92,6 +91,11 @@ public class ListVector extends BaseRepeatedValueVector {
     FieldWriter out = getWriter();
     out.setPosition(outIndex);
     ComplexCopier.copy(in, out);
+  }
+
+  @Override
+  public void copyEntry(int toIndex, ValueVector from, int fromIndex) {
+    copyFromSafe(fromIndex, toIndex, (ListVector) from);
   }
 
   @Override
@@ -316,5 +320,15 @@ public class ListVector extends BaseRepeatedValueVector {
       vector.getMutator().setValueCount(childValueCount);
       bits.getMutator().setValueCount(valueCount);
     }
+  }
+
+  @Override
+  public int getAllocatedByteCount() {
+    return offsets.getAllocatedByteCount() + bits.getAllocatedByteCount() + super.getAllocatedByteCount();
+  }
+
+  @Override
+  public int getPayloadByteCount() {
+    return offsets.getPayloadByteCount() + bits.getPayloadByteCount() + super.getPayloadByteCount();
   }
 }

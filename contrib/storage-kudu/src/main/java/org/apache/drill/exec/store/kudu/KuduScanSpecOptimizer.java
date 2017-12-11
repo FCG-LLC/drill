@@ -63,15 +63,18 @@ public class KuduScanSpecOptimizer {
         inputPermutationSets.add(new ArrayList<KuduPredicate>());
 
         List<List<KuduPredicate>> basePermutationSet = permutateScanSpec(inputPermutationSets, scanSpec);
-
         NonPrimaryKeyPermutationPruner pruner = new NonPrimaryKeyPermutationPruner(this, basePermutationSet);
-        List<List<KuduPredicate>> prunedSet = pruner.pruneNonLinkedKeys();
 
-        if (prunedSet.isEmpty() || (prunedSet.size() == 1 && prunedSet.iterator().next().size() == 0)) {
-            // Give a second chance and try to get anything out of the predicates
-            prunedSet = pruner.findMostSignificantDenominatorPredicate();
-        }
+        List<List<KuduPredicate>> prunedSet = pruner.reduceNonePredicates();
 
+        if (!pruner.isNone()) {
+            prunedSet = pruner.pruneNonLinkedKeys();
+
+            if (prunedSet.isEmpty() || (prunedSet.size() == 1 && prunedSet.iterator().next().size() == 0)) {
+                // Give a second chance and try to get anything out of the predicates
+                prunedSet = pruner.findMostSignificantDenominatorPredicate();
+            }
+        } // else pass trough if NONE is the only predicate - it will be optimized to no call at all during execution
         return prunedSet;
     }
 

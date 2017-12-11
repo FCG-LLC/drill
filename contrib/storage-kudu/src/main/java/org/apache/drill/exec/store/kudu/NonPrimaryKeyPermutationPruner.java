@@ -1,14 +1,6 @@
 package org.apache.drill.exec.store.kudu;
 
-import java.util.List;
-import java.util.Set;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Arrays;
+import java.util.*;
 
 import org.apache.kudu.Common;
 import org.apache.kudu.client.KuduPredicate;
@@ -92,6 +84,67 @@ class NonPrimaryKeyPermutationPruner {
             }
         }
         return linkedPrimaryKeyPartToRest;
+    }
+
+    private boolean isNone(KuduPredicate pred) {
+        // Unfortunately we cannot check KuduPredicate.type because it's hidden...
+        return (pred != null && pred.toString().endsWith("NONE"));
+    }
+
+    private KuduPredicate findNone(List<KuduPredicate> preds) {
+        for (KuduPredicate pred: preds) {
+            if (isNone(pred)) {
+                return pred;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns true if this pruner has permutationSet with only one predicate and it's NONE.
+     * @return
+     */
+    public boolean isNone() {
+        if (permutationSet == null || permutationSet.size() != 1) {
+            return false;
+        }
+        List<KuduPredicate> permutation = permutationSet.get(0);
+        return permutation.size() == 1 && findNone(permutation) != null;
+    }
+
+   /**
+     * Reduces/removes the predicates with KuduPredicate.Type.NONE
+     * according to the following logical laws:
+     * <pre>
+     * A and B and NONE and ... => NONE
+     * A or B or NONE or ... =>  A or B or ...
+     * </pre>
+     * We can do such reduction, because the {@link #permutationSet} top list is an alternative
+     * and the inner lists are conjunctions.
+     */
+    public List<List<KuduPredicate>> reduceNonePredicates() {
+      // NOTE: We have to catch a sample NONE predicate (column does not matter, only the type=NONE),
+      // because the designers of KuduClient library made it's constructors hidden...
+      KuduPredicate nonePredicate = null;
+      if (!permutationSet.isEmpty()) {
+          List<List<KuduPredicate>> newPermutationSet = new ArrayList<>();
+          for (List<KuduPredicate> conjunction : permutationSet) {
+              KuduPredicate foundNone = findNone(conjunction);
+              if (foundNone == null) {
+                  newPermutationSet.add(conjunction);
+              } else {
+                  nonePredicate = foundNone;
+              }
+          }
+          if (newPermutationSet.isEmpty()) {
+              // all are NONE, so just make it one big NONE predicate:
+              List<KuduPredicate> nonePermutation = new ArrayList<>(1);
+              nonePermutation.add(nonePredicate);
+              newPermutationSet.add(nonePermutation);
+          }
+          permutationSet = newPermutationSet;
+      }
+      return permutationSet;
     }
 
     public List<List<KuduPredicate>> pruneNonLinkedKeys() {

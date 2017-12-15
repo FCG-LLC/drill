@@ -63,7 +63,7 @@ public class KuduScanSpecOptimizer {
         inputPermutationSets.add(new ArrayList<KuduPredicate>());
 
         List<List<KuduPredicate>> basePermutationSet = permutateScanSpec(inputPermutationSets, scanSpec);
-        NonPrimaryKeyPermutationPruner pruner = new NonPrimaryKeyPermutationPruner(this, basePermutationSet);
+        NonPrimaryKeyPermutationPruner pruner = new NonPrimaryKeyPermutationPruner(new KuduUtils(), this, basePermutationSet);
 
         List<List<KuduPredicate>> prunedSet = pruner.reduceNonePredicates();
 
@@ -78,7 +78,7 @@ public class KuduScanSpecOptimizer {
         return prunedSet;
     }
 
-    private List<List<KuduPredicate>> permutateScanSpec(List<List<KuduPredicate>> inputPermutationSets, KuduScanSpec scanSpec) {
+    public List<List<KuduPredicate>> permutateScanSpec(List<List<KuduPredicate>> inputPermutationSets, KuduScanSpec scanSpec) {
         if (scanSpec.getPredicates().isEmpty() && scanSpec.getSubSets().isEmpty()) {
             return inputPermutationSets;
         }

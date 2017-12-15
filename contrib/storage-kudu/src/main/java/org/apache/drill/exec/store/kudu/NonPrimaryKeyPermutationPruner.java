@@ -11,13 +11,17 @@ import org.apache.kudu.client.KuduPredicate;
  * depends on multiple factors and we keep it simple here, so use naive rule for pruning such
  * cases. This also means that with more complex structures, it won't really work.
  */
-class NonPrimaryKeyPermutationPruner {
+public class NonPrimaryKeyPermutationPruner {
+
+    private KuduUtils kuduUtils;
+
     private List<List<KuduPredicate>> permutationSet;
     private KuduScanSpecOptimizer kuduScanSpecOptimizer;
 
-    NonPrimaryKeyPermutationPruner(KuduScanSpecOptimizer kuduScanSpecOptimizer, List<List<KuduPredicate>> permutationSet) {
+    public NonPrimaryKeyPermutationPruner(KuduUtils kuduUtils, KuduScanSpecOptimizer kuduScanSpecOptimizer, List<List<KuduPredicate>> permutationSet) {
         this.kuduScanSpecOptimizer = kuduScanSpecOptimizer;
         this.permutationSet = permutationSet;
+        this.kuduUtils = kuduUtils;
     }
 
     private Map<String, List<KuduPredicate>> toPredicatesByColumn(List<KuduPredicate> permutation) {
@@ -86,20 +90,6 @@ class NonPrimaryKeyPermutationPruner {
         return linkedPrimaryKeyPartToRest;
     }
 
-    private boolean isNone(KuduPredicate pred) {
-        // Unfortunately we cannot check KuduPredicate.type because it's hidden...
-        return (pred != null && pred.toString().endsWith("NONE"));
-    }
-
-    private KuduPredicate findNone(List<KuduPredicate> preds) {
-        for (KuduPredicate pred: preds) {
-            if (isNone(pred)) {
-                return pred;
-            }
-        }
-        return null;
-    }
-
     /**
      * Returns true if this pruner has permutationSet with only one predicate and it's NONE.
      * @return
@@ -109,7 +99,7 @@ class NonPrimaryKeyPermutationPruner {
             return false;
         }
         List<KuduPredicate> permutation = permutationSet.get(0);
-        return permutation.size() == 1 && findNone(permutation) != null;
+        return permutation.size() == 1 && kuduUtils.findFirstNone(permutation) != null;
     }
 
    /**
@@ -129,10 +119,10 @@ class NonPrimaryKeyPermutationPruner {
       if (!permutationSet.isEmpty()) {
           List<List<KuduPredicate>> newPermutationSet = new ArrayList<>();
           for (List<KuduPredicate> conjunction : permutationSet) {
-              KuduPredicate foundNone = findNone(conjunction);
+              KuduPredicate foundNone = kuduUtils.findFirstNone(conjunction);
               if (foundNone == null) {
                   newPermutationSet.add(conjunction);
-              } else {
+              } else if (nonePredicate == null) {
                   nonePredicate = foundNone;
               }
           }

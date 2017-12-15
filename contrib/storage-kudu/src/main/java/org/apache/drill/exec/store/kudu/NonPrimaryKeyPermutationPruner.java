@@ -1,9 +1,10 @@
 package org.apache.drill.exec.store.kudu;
 
-import java.util.*;
 
 import org.apache.kudu.Common;
 import org.apache.kudu.client.KuduPredicate;
+
+import java.util.*;
 
 /**
  * We need to check if there are no alternative scans on non-priority key items

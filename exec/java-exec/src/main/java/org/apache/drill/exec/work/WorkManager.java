@@ -17,13 +17,10 @@
  */
 package org.apache.drill.exec.work;
 
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executor;
-
-import com.codahale.metrics.Counter;
+import com.codahale.metrics.Gauge;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import org.apache.drill.common.SelfCleaningRunnable;
 import org.apache.drill.common.concurrent.ExtendedLatch;
 import org.apache.drill.exec.coord.ClusterCoordinator;
@@ -40,6 +37,7 @@ import org.apache.drill.exec.rpc.control.Controller;
 import org.apache.drill.exec.rpc.control.WorkEventBus;
 import org.apache.drill.exec.rpc.data.DataConnectionCreator;
 import org.apache.drill.exec.server.BootStrapContext;
+import org.apache.drill.exec.server.Drillbit;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.store.sys.PersistentStoreProvider;
 import org.apache.drill.exec.work.batch.ControlMessageHandler;
@@ -49,10 +47,12 @@ import org.apache.drill.exec.work.fragment.FragmentExecutor;
 import org.apache.drill.exec.work.fragment.FragmentManager;
 import org.apache.drill.exec.work.user.UserWorker;
 
-import com.codahale.metrics.Gauge;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executor;
 
 /**
  * Manages the running fragments in a Drillbit. Periodically requests run-time stats updates from fragments
@@ -79,6 +79,8 @@ public class WorkManager implements AutoCloseable {
   private final WorkEventBus workBus;
   private final Executor executor;
   private final StatusThread statusThread;
+  private long numOfRunningQueries;
+  private long numOfRunningFragments;
 
   /**
    * How often the StatusThread collects statistics about running fragments.
@@ -151,7 +153,9 @@ public class WorkManager implements AutoCloseable {
       }
     }
 
-    getContext().close();
+    if (getContext() != null) {
+      getContext().close();
+    }
   }
 
   public DrillbitContext getContext() {
@@ -165,31 +169,56 @@ public class WorkManager implements AutoCloseable {
    *
    * <p>This is intended to be used by {@link org.apache.drill.exec.server.Drillbit#close()}.</p>
    */
-  public void waitToExit() {
+  public void waitToExit(Drillbit bit, boolean forcefulShutdown) {
     synchronized(this) {
-      if (queries.isEmpty() && runningFragments.isEmpty()) {
+      numOfRunningQueries = queries.size();
+      numOfRunningFragments = runningFragments.size();
+      if ( queries.isEmpty() && runningFragments.isEmpty()) {
         return;
       }
-
+      logger.info("Draining " + queries +" queries and "+ runningFragments+" fragments.");
       exitLatch = new ExtendedLatch();
     }
-
-    // Wait for at most 5 seconds or until the latch is released.
-    exitLatch.awaitUninterruptibly(5000);
+    // Wait uninterruptibly until all the queries and running fragments on that drillbit goes down
+    // to zero
+    if( forcefulShutdown ) {
+      exitLatch.awaitUninterruptibly(5000);
+    } else {
+      exitLatch.awaitUninterruptibly();
+    }
   }
 
   /**
    * If it is safe to exit, and the exitLatch is in use, signals it so that waitToExit() will
-   * unblock.
+   * unblock. Logs the number of pending fragments and queries that are running on that
+   * drillbit to track the progress of shutdown process.
    */
   private void indicateIfSafeToExit() {
     synchronized(this) {
       if (exitLatch != null) {
+        logger.info("Waiting for "+ queries.size() +" queries to complete before shutting down");
+        logger.info("Waiting for "+ runningFragments.size() +" running fragments to complete before shutting down");
+        if(runningFragments.size() > numOfRunningFragments|| queries.size() > numOfRunningQueries) {
+          logger.info("New Fragments or queries are added while drillbit is Shutting down");
+        }
         if (queries.isEmpty() && runningFragments.isEmpty()) {
+          // Both Queries and Running fragments are empty.
+          // So its safe for the drillbit to exit.
           exitLatch.countDown();
         }
       }
     }
+  }
+  /**
+   *  Get the number of queries that are running on a drillbit.
+   *  Primarily used to monitor the number of running queries after a
+   *  shutdown request is triggered.
+   */
+  public synchronized Map<String, Integer> getRemainingQueries() {
+        Map<String, Integer> queriesInfo = new HashMap<String, Integer>();
+        queriesInfo.put("queriesCount", queries.size());
+        queriesInfo.put("fragmentsCount", runningFragments.size());
+        return queriesInfo;
   }
 
   /**
@@ -294,6 +323,9 @@ public class WorkManager implements AutoCloseable {
    * about RUNNING queries, such as current memory consumption, number of rows processed, and so on.
    * The FragmentStatusListener only tracks changes to state, so the statistics kept there will be
    * stale; this thread probes for current values.
+   *
+   * For each running fragment if the Foreman is the local Drillbit then status is updated locally bypassing the Control
+   * Tunnel, whereas for remote Foreman it is sent over the Control Tunnel.
    */
   private class StatusThread extends Thread {
     public StatusThread() {
@@ -303,30 +335,42 @@ public class WorkManager implements AutoCloseable {
 
     @Override
     public void run() {
-      while(true) {
-        final Controller controller = dContext.getController();
+
+      // Get the controller and localBitEndPoint outside the loop since these will not change once a Drillbit and
+      // StatusThread is started
+      final Controller controller = dContext.getController();
+      final DrillbitEndpoint localBitEndPoint = dContext.getEndpoint();
+
+      while (true) {
         final List<DrillRpcFuture<Ack>> futures = Lists.newArrayList();
-        for(final FragmentExecutor fragmentExecutor : runningFragments.values()) {
+        for (final FragmentExecutor fragmentExecutor : runningFragments.values()) {
           final FragmentStatus status = fragmentExecutor.getStatus();
           if (status == null) {
             continue;
           }
 
-          final DrillbitEndpoint ep = fragmentExecutor.getContext().getForemanEndpoint();
-          futures.add(controller.getTunnel(ep).sendFragmentStatus(status));
+          final DrillbitEndpoint foremanEndpoint = fragmentExecutor.getContext().getForemanEndpoint();
+
+          // If local endpoint is the Foreman for this running fragment, then submit the status locally bypassing the
+          // Control Tunnel
+          if (localBitEndPoint.equals(foremanEndpoint)) {
+            workBus.statusUpdate(status);
+          } else { // else send the status to remote Foreman over Control Tunnel
+            futures.add(controller.getTunnel(foremanEndpoint).sendFragmentStatus(status));
+          }
         }
 
-        for(final DrillRpcFuture<Ack> future : futures) {
+        for (final DrillRpcFuture<Ack> future : futures) {
           try {
             future.checkedGet();
-          } catch(final RpcException ex) {
+          } catch (final RpcException ex) {
             logger.info("Failure while sending intermediate fragment status to Foreman", ex);
           }
         }
 
         try {
           Thread.sleep(STATUS_PERIOD_SECONDS * 1000);
-        } catch(final InterruptedException e) {
+        } catch (final InterruptedException e) {
           // Preserve evidence that the interruption occurred so that code higher up on the call stack can learn of the
           // interruption and respond to it if it wants to.
           Thread.currentThread().interrupt();

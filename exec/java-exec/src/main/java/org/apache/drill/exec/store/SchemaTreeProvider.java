@@ -20,12 +20,12 @@ package org.apache.drill.exec.store;
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.calcite.jdbc.SimpleCalciteSchema;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.drill.common.AutoCloseables;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.ops.ViewExpansionContext;
+import org.apache.drill.exec.planner.sql.DynamicSchema;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.server.options.OptionManager;
 import org.apache.drill.exec.server.options.OptionValue;
@@ -105,18 +105,50 @@ public class SchemaTreeProvider implements AutoCloseable {
    * @return
    */
   public SchemaPlus createRootSchema(SchemaConfig schemaConfig) {
+      final SchemaPlus rootSchema = DynamicSchema.createRootSchema(dContext.getStorage(), schemaConfig);
+      schemaTreesToClose.add(rootSchema);
+      return rootSchema;
+  }
+
+  /**
+   * Return full root schema with schema owner as the given user.
+   *
+   * @param userName Name of the user who is accessing the storage sources.
+   * @param provider {@link SchemaConfigInfoProvider} instance
+   * @return Root of the schema tree.
+   */
+  public SchemaPlus createFullRootSchema(final String userName, final SchemaConfigInfoProvider provider) {
+    final String schemaUser = isImpersonationEnabled ? userName : ImpersonationUtil.getProcessUserName();
+    final SchemaConfig schemaConfig = SchemaConfig.newBuilder(schemaUser, provider).build();
+    return createFullRootSchema(schemaConfig);
+  }
+  /**
+   * Create and return a Full SchemaTree with given <i>schemaConfig</i>.
+   * @param schemaConfig
+   * @return
+   */
+  public SchemaPlus createFullRootSchema(SchemaConfig schemaConfig) {
     try {
-      final SchemaPlus rootSchema = SimpleCalciteSchema.createRootSchema(false);
+      final SchemaPlus rootSchema = DynamicSchema.createRootSchema(dContext.getStorage(), schemaConfig);
       dContext.getSchemaFactory().registerSchemas(schemaConfig, rootSchema);
       schemaTreesToClose.add(rootSchema);
       return rootSchema;
-    } catch(IOException e) {
+    }
+    catch(IOException e) {
       // We can't proceed further without a schema, throw a runtime exception.
+      // Improve the error message for client side.
+
+      final String contextString = isImpersonationEnabled ? "[Hint: Username is absent in connection URL or doesn't " +
+          "exist on Drillbit node. Please specify a username in connection URL which is present on Drillbit node.]" :
+          "";
       throw UserException
           .resourceError(e)
           .message("Failed to create schema tree.")
+          .addContext("IOException: ", e.getMessage())
+          .addContext(contextString)
           .build(logger);
     }
+
   }
 
   @Override

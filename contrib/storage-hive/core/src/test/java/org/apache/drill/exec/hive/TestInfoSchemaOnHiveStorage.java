@@ -18,10 +18,14 @@
 package org.apache.drill.exec.hive;
 
 import com.google.common.base.Strings;
-import org.apache.drill.TestBuilder;
+import org.apache.drill.categories.HiveStorageTest;
+import org.apache.drill.test.TestBuilder;
+import org.apache.drill.categories.SlowTest;
 import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
+@Category({SlowTest.class, HiveStorageTest.class})
 public class TestInfoSchemaOnHiveStorage extends HiveTestBase {
   private static final String[] baselineCols = new String[] {"COLUMN_NAME", "DATA_TYPE", "IS_NULLABLE"};
   private static final Object[] expVal1 = new Object[] {"key", "INTEGER", "YES"};
@@ -63,9 +67,10 @@ public class TestInfoSchemaOnHiveStorage extends HiveTestBase {
         .baselineValues("hive.skipper", "kv_text_large")
         .baselineValues("hive.skipper", "kv_incorrect_skip_header")
         .baselineValues("hive.skipper", "kv_incorrect_skip_footer")
-        .baselineValues("hive.skipper", "kv_rcfile_large")
-        .baselineValues("hive.skipper", "kv_parquet_large")
-        .baselineValues("hive.skipper", "kv_sequencefile_large")
+        .baselineValues("hive.skipper", "kv_text_header_only")
+        .baselineValues("hive.skipper", "kv_text_footer_only")
+        .baselineValues("hive.skipper", "kv_text_header_footer_only")
+        .baselineValues("hive.skipper", "kv_text_with_part")
         .go();
   }
 
@@ -82,9 +87,6 @@ public class TestInfoSchemaOnHiveStorage extends HiveTestBase {
         .baselineValues("dfs.root")
         .baselineValues("dfs.tmp")
         .baselineValues("sys")
-        .baselineValues("dfs_test.home")
-        .baselineValues("dfs_test.default")
-        .baselineValues("dfs_test.tmp")
         .baselineValues("cp.default")
         .baselineValues("INFORMATION_SCHEMA")
         .go();
@@ -254,9 +256,10 @@ public class TestInfoSchemaOnHiveStorage extends HiveTestBase {
         .baselineValues("DRILL", "hive.skipper", "kv_text_large", "TABLE")
         .baselineValues("DRILL", "hive.skipper", "kv_incorrect_skip_header", "TABLE")
         .baselineValues("DRILL", "hive.skipper", "kv_incorrect_skip_footer", "TABLE")
-        .baselineValues("DRILL", "hive.skipper", "kv_rcfile_large", "TABLE")
-        .baselineValues("DRILL", "hive.skipper", "kv_parquet_large", "TABLE")
-        .baselineValues("DRILL", "hive.skipper", "kv_sequencefile_large", "TABLE")
+        .baselineValues("DRILL", "hive.skipper", "kv_text_header_only", "TABLE")
+        .baselineValues("DRILL", "hive.skipper", "kv_text_footer_only", "TABLE")
+        .baselineValues("DRILL", "hive.skipper", "kv_text_header_footer_only", "TABLE")
+        .baselineValues("DRILL", "hive.skipper", "kv_text_with_part", "TABLE")
         .go();
   }
 

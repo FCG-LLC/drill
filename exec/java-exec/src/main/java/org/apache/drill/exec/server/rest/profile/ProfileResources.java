@@ -37,6 +37,7 @@ import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriInfo;
 import javax.xml.bind.annotation.XmlRootElement;
 
+import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.exec.ExecConstants;
@@ -55,7 +56,6 @@ import org.apache.drill.exec.store.sys.PersistentStore;
 import org.apache.drill.exec.store.sys.PersistentStoreProvider;
 import org.apache.drill.exec.work.WorkManager;
 import org.apache.drill.exec.work.foreman.Foreman;
-import org.apache.drill.exec.work.foreman.QueryManager;
 import org.glassfish.jersey.server.mvc.Viewable;
 
 import com.google.common.collect.Lists;
@@ -63,7 +63,7 @@ import com.google.common.collect.Lists;
 @Path("/")
 @RolesAllowed(DrillUserPrincipal.AUTHENTICATED_ROLE)
 public class ProfileResources {
-  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ProfileResources.class);
+  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ProfileResources.class);
 
   @Inject UserAuthEnabled authEnabled;
   @Inject WorkManager work;
@@ -71,75 +71,120 @@ public class ProfileResources {
   @Inject SecurityContext sc;
 
   public static class ProfileInfo implements Comparable<ProfileInfo> {
+    private static final int QUERY_SNIPPET_MAX_CHAR = 150;
+    private static final int QUERY_SNIPPET_MAX_LINES = 8;
+
     public static final SimpleDateFormat format = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
 
-    private String queryId;
-    private long startTime;
-    private long endTime;
-    private Date time;
-    private String location;
-    private String foreman;
-    private String query;
-    private String state;
-    private String user;
+    private final String queryId;
+    private final long startTime;
+    private final long endTime;
+    private final Date time;
+    private final String link;
+    private final String foreman;
+    private final String query;
+    private final String state;
+    private final String user;
+    private final double totalCost;
+    private final String queueName;
 
-    public ProfileInfo(String queryId, long startTime, long endTime, String foreman, String query, String state, String user) {
+    public ProfileInfo(DrillConfig drillConfig, String queryId, long startTime, long endTime, String foreman, String query,
+                       String state, String user, double totalCost, String queueName) {
       this.queryId = queryId;
       this.startTime = startTime;
       this.endTime = endTime;
       this.time = new Date(startTime);
       this.foreman = foreman;
-      this.location = "http://localhost:8047/profile/" + queryId + ".json";
-      this.query = query.substring(0,  Math.min(query.length(), 150));
+      this.link = generateLink(drillConfig, foreman, queryId);
+      this.query = extractQuerySnippet(query);
       this.state = state;
       this.user = user;
+      this.totalCost = totalCost;
+      this.queueName = queueName;
     }
 
-    public String getUser() {
-      return user;
-    }
+    public String getUser() { return user; }
 
-    public String getQuery(){
-      return query;
-    }
+    public String getQuery() { return query; }
 
-    public String getQueryId() {
-      return queryId;
-    }
+    public String getQueryId() { return queryId; }
 
-    public String getTime() {
-      return format.format(time);
-    }
+    public String getTime() { return format.format(time); }
 
-    public long getStartTime() {
-      return startTime;
-    }
+    public long getStartTime() { return startTime; }
 
-    public long getEndTime() {
-      return endTime;
-    }
+    public long getEndTime() { return endTime; }
 
     public String getDuration() {
       return (new SimpleDurationFormat(startTime, endTime)).verbose();
     }
 
-    public String getState() {
-      return state;
-    }
+    public String getState() { return state; }
 
-    public String getLocation() {
-      return location;
-    }
+    public String getLink() { return link; }
 
     @Override
     public int compareTo(ProfileInfo other) {
       return time.compareTo(other.time);
     }
 
-    public String getForeman() {
-      return foreman;
+    public String getForeman() { return foreman; }
+
+    public double getTotalCost() { return totalCost; }
+
+    public String getQueueName() { return queueName; }
+
+    /**
+     * Generates link which will return query profile in json representation.
+     *
+     * @param drillConfig drill configuration
+     * @param foreman foreman hostname
+     * @param queryId query id
+     * @return link
+     */
+    private String generateLink(DrillConfig drillConfig, String foreman, String queryId) {
+      StringBuilder sb = new StringBuilder();
+      if (drillConfig.getBoolean(ExecConstants.HTTP_ENABLE_SSL)) {
+        sb.append("https://");
+      } else {
+        sb.append("http://");
+      }
+      sb.append(foreman);
+      sb.append(":");
+      sb.append(drillConfig.getInt(ExecConstants.HTTP_PORT));
+      sb.append("/profiles/");
+      sb.append(queryId);
+      sb.append(".json");
+      return sb.toString();
     }
 
+    /**
+     * Extract only the first 150 characters of the query.
+     * If this spans more than 8 lines, we truncate excess lines for sake of readability
+     * @param queryText
+     * @return truncated text
+     */
+    private String extractQuerySnippet(String queryText) {
+      //Extract upto max char limit as snippet
+      String sizeCappedQuerySnippet = queryText.substring(0,  Math.min(queryText.length(), QUERY_SNIPPET_MAX_CHAR));
+      String[] queryParts = sizeCappedQuerySnippet.split(System.lineSeparator());
+      //Trimming down based on line-count
+      if (QUERY_SNIPPET_MAX_LINES < queryParts.length) {
+        int linesConstructed = 0;
+        StringBuilder lineCappedQuerySnippet = new StringBuilder();
+        for (String qPart : queryParts) {
+          lineCappedQuerySnippet.append(qPart);
+          if (++linesConstructed < QUERY_SNIPPET_MAX_LINES) {
+            lineCappedQuerySnippet.append(System.lineSeparator());
+          } else {
+            lineCappedQuerySnippet.append(" ... ");
+            break;
+          }
+        }
+        return lineCappedQuerySnippet.toString();
+      }
+      return sizeCappedQuerySnippet;
+    }
   }
 
   protected PersistentStoreProvider getProvider() {
@@ -170,12 +215,17 @@ public class ProfileResources {
       return finishedQueries;
     }
 
+    public int getMaxFetchedQueries() {
+      return work.getContext().getConfig().getInt(ExecConstants.HTTP_MAX_PROFILES);
+    }
+
     public List<String> getErrors() { return errors; }
   }
 
   //max Param to cap listing of profiles
   private static final String MAX_QPROFILES_PARAM = "max";
 
+  @SuppressWarnings("resource")
   @GET
   @Path("/profiles.json")
   @Produces(MediaType.APPLICATION_JSON)
@@ -195,7 +245,12 @@ public class ProfileResources {
           final Map.Entry<String, QueryInfo> runningEntry = runningEntries.next();
           final QueryInfo profile = runningEntry.getValue();
           if (principal.canManageProfileOf(profile.getUser())) {
-            runningQueries.add(new ProfileInfo(runningEntry.getKey(), profile.getStart(), System.currentTimeMillis(), profile.getForeman().getAddress(), profile.getQuery(), profile.getState().name(), profile.getUser()));
+            runningQueries.add(
+                new ProfileInfo(work.getContext().getConfig(),
+                    runningEntry.getKey(), profile.getStart(), System.currentTimeMillis(),
+                    profile.getForeman().getAddress(), profile.getQuery(),
+                    ProfileUtil.getQueryStateDisplayName(profile.getState()),
+                    profile.getUser(), profile.getTotalCost(), profile.getQueueName()));
           }
         } catch (Exception e) {
           errors.add(e.getMessage());
@@ -221,7 +276,12 @@ public class ProfileResources {
           final Map.Entry<String, QueryProfile> profileEntry = range.next();
           final QueryProfile profile = profileEntry.getValue();
           if (principal.canManageProfileOf(profile.getUser())) {
-            finishedQueries.add(new ProfileInfo(profileEntry.getKey(), profile.getStart(), profile.getEnd(), profile.getForeman().getAddress(), profile.getQuery(), profile.getState().name(), profile.getUser()));
+            finishedQueries.add(
+                new ProfileInfo(work.getContext().getConfig(),
+                    profileEntry.getKey(), profile.getStart(), profile.getEnd(),
+                    profile.getForeman().getAddress(), profile.getQuery(),
+                    ProfileUtil.getQueryStateDisplayName(profile.getState()),
+                    profile.getUser(), profile.getTotalCost(), profile.getQueueName()));
           }
         } catch (Exception e) {
           errors.add(e.getMessage());
@@ -247,6 +307,7 @@ public class ProfileResources {
     return ViewableWithPermissions.create(authEnabled.get(), "/rest/profile/list.ftl", sc, profiles);
   }
 
+  @SuppressWarnings("resource")
   private QueryProfile getQueryProfile(String queryId) {
     QueryId id = QueryIdHelper.getQueryIdFromString(queryId);
 
@@ -313,7 +374,7 @@ public class ProfileResources {
     return ViewableWithPermissions.create(authEnabled.get(), "/rest/profile/profile.ftl", sc, wrapper);
   }
 
-
+  @SuppressWarnings("resource")
   @GET
   @Path("/profiles/cancel/{queryid}")
   @Produces(MediaType.TEXT_PLAIN)
@@ -342,7 +403,8 @@ public class ProfileResources {
       }
     }catch(Exception e){
       logger.debug("Failure to find query as running profile.", e);
-      return String.format("Failure attempting to cancel query %s.  Unable to find information about where query is actively running.", queryId);
+      return String.format
+          ("Failure attempting to cancel query %s.  Unable to find information about where query is actively running.", queryId);
     }
   }
 

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -21,11 +21,23 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.jaxrs.base.JsonMappingExceptionMapper;
 import com.fasterxml.jackson.jaxrs.base.JsonParseExceptionMapper;
 import com.fasterxml.jackson.jaxrs.json.JacksonJaxbJsonProvider;
+import com.google.common.base.Strings;
+import freemarker.cache.ClassTemplateLoader;
+import freemarker.cache.FileTemplateLoader;
+import freemarker.cache.MultiTemplateLoader;
+import freemarker.cache.TemplateLoader;
+import freemarker.cache.WebappTemplateLoader;
+import freemarker.core.HTMLOutputFormat;
+import freemarker.template.Configuration;
+import io.netty.channel.ChannelPromise;
+import io.netty.channel.DefaultChannelPromise;
+import io.netty.util.concurrent.EventExecutor;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.UserBitShared;
 import org.apache.drill.exec.rpc.user.UserSession;
+import org.apache.drill.exec.server.Drillbit;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.server.rest.WebUserConnection.AnonWebUserConnection;
 import org.apache.drill.exec.server.rest.auth.AuthDynamicFeature;
@@ -47,17 +59,22 @@ import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
 import org.glassfish.jersey.server.mvc.freemarker.FreemarkerMvcFeature;
 
 import javax.inject.Inject;
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
+import java.io.File;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.security.Principal;
+import java.util.ArrayList;
+import java.util.List;
 
 public class DrillRestServer extends ResourceConfig {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DrillRestServer.class);
 
-  public DrillRestServer(final WorkManager workManager) {
+  public DrillRestServer(final WorkManager workManager, final ServletContext servletContext, final Drillbit drillbit) {
     register(DrillRoot.class);
     register(StatusResources.class);
     register(StorageResources.class);
@@ -66,7 +83,10 @@ public class DrillRestServer extends ResourceConfig {
     register(MetricsResources.class);
     register(ThreadsResources.class);
     register(LogsResources.class);
+
+    property(FreemarkerMvcFeature.TEMPLATE_OBJECT_FACTORY, getFreemarkerConfiguration(servletContext));
     register(FreemarkerMvcFeature.class);
+
     register(MultiPartFeature.class);
     property(ServerProperties.METAINF_SERVICES_LOOKUP_DISABLE, true);
 
@@ -92,10 +112,18 @@ public class DrillRestServer extends ResourceConfig {
     provider.setMapper(workManager.getContext().getLpPersistence().getMapper());
     register(provider);
 
+    // Get an EventExecutor out of the BitServer EventLoopGroup to notify listeners for WebUserConnection. For
+    // actual connections between Drillbits this EventLoopGroup is used to handle network related events. Though
+    // there is no actual network connection associated with WebUserConnection but we need a CloseFuture in
+    // WebSessionResources, so we are using EvenExecutor from network EventLoopGroup pool.
+    final EventExecutor executor = workManager.getContext().getBitLoopGroup().next();
+
     register(new AbstractBinder() {
       @Override
       protected void configure() {
+        bind(drillbit).to(Drillbit.class);
         bind(workManager).to(WorkManager.class);
+        bind(executor).to(EventExecutor.class);
         bind(workManager.getContext().getLpPersistence().getMapper()).to(ObjectMapper.class);
         bind(workManager.getContext().getStoreProvider()).to(PersistentStoreProvider.class);
         bind(workManager.getContext().getStorage()).to(StoragePluginRegistry.class);
@@ -111,6 +139,30 @@ public class DrillRestServer extends ResourceConfig {
     });
   }
 
+  /**
+   * Creates freemarker configuration settings,
+   * default output format to trigger auto-escaping policy
+   * and template loaders.
+   *
+   * @param servletContext servlet context
+   * @return freemarker configuration settings
+   */
+  private Configuration getFreemarkerConfiguration(ServletContext servletContext) {
+    Configuration configuration = new Configuration(Configuration.VERSION_2_3_26);
+    configuration.setOutputFormat(HTMLOutputFormat.INSTANCE);
+
+    List<TemplateLoader> loaders = new ArrayList<>();
+    loaders.add(new WebappTemplateLoader(servletContext));
+    loaders.add(new ClassTemplateLoader(DrillRestServer.class, "/"));
+    try {
+      loaders.add(new FileTemplateLoader(new File("/")));
+    } catch (IOException e) {
+      logger.error("Could not set up file template loader.", e);
+    }
+    configuration.setTemplateLoader(new MultiTemplateLoader(loaders.toArray(new TemplateLoader[loaders.size()])));
+    return configuration;
+  }
+
   public static class AuthWebUserConnectionProvider implements Factory<WebUserConnection> {
 
     @Inject
@@ -119,6 +171,10 @@ public class DrillRestServer extends ResourceConfig {
     @Inject
     WorkManager workManager;
 
+    @Inject
+    EventExecutor executor;
+
+    @SuppressWarnings("resource")
     @Override
     public WebUserConnection provide() {
       final HttpSession session = request.getSession();
@@ -163,9 +219,15 @@ public class DrillRestServer extends ResourceConfig {
                 config.getLong(ExecConstants.HTTP_SESSION_MEMORY_RESERVATION),
                 config.getLong(ExecConstants.HTTP_SESSION_MEMORY_MAXIMUM));
 
+        // Create a dummy close future which is needed by Foreman only. Foreman uses this future to add a close
+        // listener to known about channel close event from underlying layer. We use this future to notify Foreman
+        // listeners when the Web session (not connection) between Web Client and WebServer is closed. This will help
+        // Foreman to cancel all the running queries for this Web Client.
+        final ChannelPromise closeFuture = new DefaultChannelPromise(null, executor);
+
         // Create a WebSessionResource instance which owns the lifecycle of all the session resources.
-        // Set this instance as an attribute of HttpSession, since it will be used until session is destroyed.
-        webSessionResources = new WebSessionResources(sessionAllocator, remoteAddress, drillUserSession);
+        // Set this instance as an attribute of HttpSession, since it will be used until session is destroyed
+        webSessionResources = new WebSessionResources(sessionAllocator, remoteAddress, drillUserSession, closeFuture);
         session.setAttribute(WebSessionResources.class.getSimpleName(), webSessionResources);
       }
       // Create a new WebUserConnection for the request
@@ -186,9 +248,12 @@ public class DrillRestServer extends ResourceConfig {
     @Inject
     WorkManager workManager;
 
+    @Inject
+    EventExecutor executor;
+
+    @SuppressWarnings("resource")
     @Override
     public WebUserConnection provide() {
-      final HttpSession session = request.getSession();
       final DrillbitContext drillbitContext = workManager.getContext();
       final DrillConfig config = drillbitContext.getConfig();
 
@@ -198,9 +263,9 @@ public class DrillRestServer extends ResourceConfig {
                       config.getLong(ExecConstants.HTTP_SESSION_MEMORY_RESERVATION),
                       config.getLong(ExecConstants.HTTP_SESSION_MEMORY_MAXIMUM));
 
-      final Principal sessionUserPrincipal = new AnonDrillUserPrincipal();
+      final Principal sessionUserPrincipal = createSessionUserPrincipal(config, request);
 
-      // Create new UserSession for each request from Anonymous user
+      // Create new UserSession for each request from non-authenticated user
       final UserSession drillUserSession = UserSession.Builder.newBuilder()
               .withCredentials(UserBitShared.UserCredentials.newBuilder()
                       .setUserName(sessionUserPrincipal.getName())
@@ -219,8 +284,15 @@ public class DrillRestServer extends ResourceConfig {
         logger.trace("Failed to get the remote address of the http session request", ex);
       }
 
-      final WebSessionResources webSessionResources = new WebSessionResources(sessionAllocator,
-              remoteAddress, drillUserSession);
+      // Create a dummy close future which is needed by Foreman only. Foreman uses this future to add a close
+      // listener to known about channel close event from underlying layer.
+      //
+      // The invocation of this close future is no-op as it will be triggered after query completion in unsecure case.
+      // But we need this close future as it's expected by Foreman.
+      final ChannelPromise closeFuture = new DefaultChannelPromise(null, executor);
+
+      final WebSessionResources webSessionResources = new WebSessionResources(sessionAllocator, remoteAddress,
+          drillUserSession, closeFuture);
 
       // Create a AnonWenUserConnection for this request
       return new AnonWebUserConnection(webSessionResources);
@@ -230,6 +302,26 @@ public class DrillRestServer extends ResourceConfig {
     public void dispose(WebUserConnection instance) {
 
     }
+
+    /**
+     * Creates session user principal. If impersonation is enabled without authentication and User-Name header is present and valid,
+     * will create session user principal with provided user name, otherwise anonymous user name will be used.
+     * In both cases session user principal will have admin rights.
+     *
+     * @param config drill config
+     * @param request client request
+     * @return session user principal
+     */
+    private Principal createSessionUserPrincipal(DrillConfig config, HttpServletRequest request) {
+      if (WebServer.isImpersonationOnlyEnabled(config)) {
+        final String userName = request.getHeader("User-Name");
+        if (!Strings.isNullOrEmpty(userName)) {
+          return new DrillUserPrincipal(userName, true);
+        }
+      }
+      return new AnonDrillUserPrincipal();
+    }
+
   }
 
   // Provider which injects DrillUserPrincipal directly instead of getting it from SecurityContext and typecasting

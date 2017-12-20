@@ -29,7 +29,7 @@ import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.config.LogicalPlanPersistence;
 import org.apache.drill.common.scanner.ClassPathScanner;
 import org.apache.drill.common.scanner.persistence.ScanResult;
-import org.apache.drill.common.util.TestTools;
+import org.apache.drill.test.TestTools;
 import org.apache.drill.exec.ExecTest;
 import org.apache.drill.exec.expr.fn.FunctionImplementationRegistry;
 import org.apache.drill.exec.memory.BufferAllocator;
@@ -80,7 +80,7 @@ public class PlanningBase extends ExecTest{
     provider.start();
     final ScanResult scanResult = ClassPathScanner.fromPrescan(config);
     final LogicalPlanPersistence logicalPlanPersistence = new LogicalPlanPersistence(config, scanResult);
-    final SystemOptionManager systemOptions = new SystemOptionManager(logicalPlanPersistence , provider);
+    final SystemOptionManager systemOptions = new SystemOptionManager(logicalPlanPersistence , provider, config);
     systemOptions.init();
     @SuppressWarnings("resource")
     final UserSession userSession = UserSession.Builder.newBuilder().withOptionManager(systemOptions).build();

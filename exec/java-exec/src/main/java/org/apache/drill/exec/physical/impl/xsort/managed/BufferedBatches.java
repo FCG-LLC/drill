@@ -24,7 +24,7 @@ import java.util.List;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.exec.exception.OutOfMemoryException;
 import org.apache.drill.exec.memory.BufferAllocator;
-import org.apache.drill.exec.ops.OperExecContext;
+import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.impl.sort.RecordBatchData;
 import org.apache.drill.exec.physical.impl.xsort.managed.BatchGroup.InputBatch;
 import org.apache.drill.exec.record.BatchSchema;
@@ -55,9 +55,9 @@ public class BufferedBatches {
 
   private BatchSchema schema;
 
-  private final OperExecContext context;
+  private final OperatorContext context;
 
-  public BufferedBatches(OperExecContext opContext) {
+  public BufferedBatches(OperatorContext opContext) {
     context = opContext;
     sorterWrapper = new SorterWrapper(opContext);
   }
@@ -79,7 +79,7 @@ public class BufferedBatches {
   public int size() { return bufferedBatches.size(); }
 
   @SuppressWarnings("resource")
-  public void add(VectorAccessible incoming, int batchSize) {
+  public void add(VectorAccessible incoming, long batchSize) {
     // Convert the incoming batch to the agreed-upon schema.
     // No converted batch means we got an empty input batch.
     // Converting the batch transfers memory ownership to our
@@ -106,6 +106,7 @@ public class BufferedBatches {
     sorterWrapper.sortBatch(convertedBatch, sv2);
     bufferBatch(convertedBatch, sv2, batchSize);
   }
+
   /**
    * Convert an incoming batch into the agree-upon format.
    * @param incoming
@@ -164,7 +165,7 @@ public class BufferedBatches {
   }
 
   @SuppressWarnings("resource")
-  private void bufferBatch(VectorContainer convertedBatch, SelectionVector2 sv2, int netSize) {
+  private void bufferBatch(VectorContainer convertedBatch, SelectionVector2 sv2, long netSize) {
     BufferAllocator allocator = context.getAllocator();
     RecordBatchData rbd = new RecordBatchData(convertedBatch, allocator);
     try {

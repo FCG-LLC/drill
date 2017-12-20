@@ -23,6 +23,8 @@ import static org.junit.Assert.assertTrue;
 
 import java.nio.charset.Charset;
 
+import org.apache.drill.categories.UnlikelyTest;
+import org.apache.drill.categories.VectorTest;
 import org.apache.drill.common.AutoCloseables;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.types.TypeProtos;
@@ -67,7 +69,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 
 import io.netty.buffer.DrillBuf;
+import org.junit.experimental.categories.Category;
 
+@Category(VectorTest.class)
 public class TestValueVector extends ExecTest {
   //private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestValueVector.class);
 
@@ -93,6 +97,7 @@ public class TestValueVector extends ExecTest {
   }
 
   @Test(expected = OversizedAllocationException.class)
+  @Category(UnlikelyTest.class)
   public void testFixedVectorReallocation() {
     final MaterializedField field = MaterializedField.create(EMPTY_SCHEMA_PATH, UInt4Holder.TYPE);
     @SuppressWarnings("resource")
@@ -119,6 +124,7 @@ public class TestValueVector extends ExecTest {
   }
 
   @Test(expected = OversizedAllocationException.class)
+  @Category(UnlikelyTest.class)
   public void testBitVectorReallocation() {
     final MaterializedField field = MaterializedField.create(EMPTY_SCHEMA_PATH, UInt4Holder.TYPE);
     final BitVector vector = new BitVector(field, allocator);
@@ -149,6 +155,7 @@ public class TestValueVector extends ExecTest {
   }
 
   @Test(expected = OversizedAllocationException.class)
+  @Category(UnlikelyTest.class)
   public void testVariableVectorReallocation() {
     final MaterializedField field = MaterializedField.create(EMPTY_SCHEMA_PATH, UInt4Holder.TYPE);
     @SuppressWarnings("resource")

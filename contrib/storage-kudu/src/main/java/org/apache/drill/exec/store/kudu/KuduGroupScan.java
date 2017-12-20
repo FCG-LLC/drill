@@ -45,6 +45,7 @@ import org.apache.drill.exec.store.schedule.AssignmentCreator;
 import org.apache.drill.exec.store.schedule.CompleteWork;
 import org.apache.drill.exec.store.schedule.EndpointByteMap;
 import org.apache.drill.exec.store.schedule.EndpointByteMapImpl;
+import org.apache.drill.exec.util.Utilities;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduTable;
@@ -115,10 +116,10 @@ public class KuduGroupScan extends AbstractGroupScan {
     for (List<KuduPredicate> predicateSet : predicatePermutationSets) {
       KuduScanToken.KuduScanTokenBuilder scanTokenBuilder = client.newScanTokenBuilder(table);
 
-      if (!AbstractRecordReader.isStarQuery(columns)) {
+      if (!Utilities.isStarQuery(columns)) {
         List<String> colNames = Lists.newArrayList();
         for (SchemaPath p : this.getColumns()) {
-          colNames.add(p.getAsUnescapedPath());
+          colNames.add(p.getRootSegmentPath());
         }
 
         // We must set projected columns in order, otherwise nasty things
@@ -303,7 +304,7 @@ public class KuduGroupScan extends AbstractGroupScan {
 
     long recordCount = (getHashBuckets() * ESTIMATED_RECORD_COUNT_PER_PARTITION / constraintsDenominator);
 
-    int columnsNominator = AbstractRecordReader.isStarQuery(columns) ? this.getTableSchema().getColumns().size() : this.getColumns().size();
+    int columnsNominator = Utilities.isStarQuery(columns) ? this.getTableSchema().getColumns().size() : this.getColumns().size();
 
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, recordCount, columnsNominator/((float) constraintsDenominator), columnsNominator * recordCount);
   }

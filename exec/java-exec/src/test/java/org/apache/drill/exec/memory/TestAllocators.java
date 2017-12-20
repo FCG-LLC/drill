@@ -27,9 +27,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 
+import org.apache.drill.categories.MemoryTest;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.types.TypeProtos;
-import org.apache.drill.common.util.FileUtils;
+import org.apache.drill.common.util.DrillFileUtils;
 import org.apache.drill.exec.exception.OutOfMemoryException;
 import org.apache.drill.exec.expr.fn.FunctionImplementationRegistry;
 import org.apache.drill.exec.ops.FragmentContext;
@@ -57,7 +58,9 @@ import org.junit.Test;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.google.common.io.Files;
+import org.junit.experimental.categories.Category;
 
+@Category(MemoryTest.class)
 public class TestAllocators extends DrillTest {
 
   private static final Properties TEST_CONFIGURATIONS = new Properties() {
@@ -201,7 +204,7 @@ public class TestAllocators extends DrillTest {
       // Get a few physical operators. Easiest way is to read a physical plan.
       PhysicalPlanReader planReader = PhysicalPlanReaderTestFactory.defaultPhysicalPlanReader(bitContext,
           storageRegistry);
-      PhysicalPlan plan = planReader.readPhysicalPlan(Files.toString(FileUtils.getResourceAsFile(planFile),
+      PhysicalPlan plan = planReader.readPhysicalPlan(Files.toString(DrillFileUtils.getResourceAsFile(planFile),
           Charsets.UTF_8));
       List<PhysicalOperator> physicalOperators = plan.getSortedOperators();
       Iterator<PhysicalOperator> physicalOperatorIterator = physicalOperators.iterator();

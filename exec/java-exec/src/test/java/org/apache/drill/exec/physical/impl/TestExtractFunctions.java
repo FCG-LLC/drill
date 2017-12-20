@@ -22,7 +22,8 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.List;
 
-import org.apache.drill.common.util.FileUtils;
+import org.apache.drill.categories.SlowTest;
+import org.apache.drill.common.util.DrillFileUtils;
 import org.apache.drill.exec.client.DrillClient;
 import org.apache.drill.exec.pop.PopUnitTestBase;
 import org.apache.drill.exec.record.RecordBatchLoader;
@@ -35,14 +36,14 @@ import org.junit.Test;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.Files;
+import org.junit.experimental.categories.Category;
 
 /* This class tests the existing date types. Simply using date types
  * by casting from VarChar, performing basic functions and converting
  * back to VarChar.
  */
+@Category({SlowTest.class})
 public class TestExtractFunctions extends PopUnitTestBase {
-  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestExtractFunctions.class);
-
   @Test
   public void testFromDate() throws Exception {
     long expectedValues[][] = { {00, 00, 02, 01, 1970}, {00, 00, 28, 12, 2008}, {00, 00, 27, 02, 2000} };
@@ -111,7 +112,7 @@ public class TestExtractFunctions extends PopUnitTestBase {
       bit.run();
       client.connect();
       List<QueryDataBatch> results = client.runQuery(org.apache.drill.exec.proto.UserBitShared.QueryType.PHYSICAL,
-        Files.toString(FileUtils.getResourceAsFile("/functions/extractFrom.json"), Charsets.UTF_8)
+        Files.toString(DrillFileUtils.getResourceAsFile("/functions/extractFrom.json"), Charsets.UTF_8)
         .replace("#{TEST_TYPE}", fromType)
         .replace("#{TEST_FILE}", testDataFile)
         .replace("#{COLUMN_NAME}", columnName));

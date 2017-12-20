@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,15 +19,20 @@
 package org.apache.drill.exec.store.hive;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.attribute.PosixFilePermission;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.util.Map;
+import java.util.Set;
 
+import com.google.common.collect.Sets;
 import com.google.common.io.Resources;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.drill.BaseTestQuery;
+import org.apache.drill.test.BaseTestQuery;
 import org.apache.drill.common.exceptions.DrillException;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.hadoop.fs.FileSystem;
@@ -39,21 +44,26 @@ import org.apache.hadoop.hive.ql.session.SessionState;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.hive.serde.serdeConstants;
 
-import static org.apache.drill.BaseTestQuery.getTempDir;
 import static org.apache.drill.exec.hive.HiveTestUtilities.executeQuery;
 
 public class HiveTestDataGenerator {
   private static final String HIVE_TEST_PLUGIN_NAME = "hive";
   private static HiveTestDataGenerator instance;
+  private static File baseDir;
 
   private final String dbDir;
   private final String whDir;
   private final Map<String, String> config;
 
-  public static synchronized HiveTestDataGenerator getInstance() throws Exception {
-    if (instance == null) {
-      final String dbDir = getTempDir("metastore_db");
-      final String whDir = getTempDir("warehouse");
+  public static synchronized HiveTestDataGenerator getInstance(File baseDir) throws Exception {
+    if (instance == null || !HiveTestDataGenerator.baseDir.equals(baseDir)) {
+      HiveTestDataGenerator.baseDir = baseDir;
+
+      File dbDirFile = new File(baseDir, "metastore_db");
+      File whDirFile = new File(baseDir, "warehouse");
+
+      final String dbDir = dbDirFile.getAbsolutePath();
+      final String whDir = whDirFile.getAbsolutePath();
 
       instance = new HiveTestDataGenerator(dbDir, whDir);
       instance.generateTestData();
@@ -111,15 +121,33 @@ public class HiveTestDataGenerator {
     pluginRegistry.deletePlugin(HIVE_TEST_PLUGIN_NAME);
   }
 
+  public static File createFileWithPermissions(File baseDir, String name) {
+    Set<PosixFilePermission> perms = Sets.newHashSet(PosixFilePermission.values());
+    File dir = new File(baseDir, name);
+    dir.mkdirs();
+
+    try {
+      Files.setPosixFilePermissions(dir.toPath(), perms);
+    } catch (IOException e) {
+      new RuntimeException(e);
+    }
+
+    return dir;
+  }
+
   private void generateTestData() throws Exception {
     HiveConf conf = new HiveConf(SessionState.class);
+
+    File scratchDir = createFileWithPermissions(baseDir, "scratch_dir");
+    File localScratchDir = createFileWithPermissions(baseDir, "local_scratch_dir");
+    File part1Dir = createFileWithPermissions(baseDir, "part1");
 
     conf.set("javax.jdo.option.ConnectionURL", String.format("jdbc:derby:;databaseName=%s;create=true", dbDir));
     conf.set(FileSystem.FS_DEFAULT_NAME_KEY, FileSystem.DEFAULT_FS);
     conf.set("hive.metastore.warehouse.dir", whDir);
     conf.set("mapred.job.tracker", "local");
-    conf.set(ConfVars.SCRATCHDIR.varname,  getTempDir("scratch_dir"));
-    conf.set(ConfVars.LOCALSCRATCHDIR.varname, getTempDir("local_scratch_dir"));
+    conf.set(ConfVars.SCRATCHDIR.varname,  scratchDir.getAbsolutePath());
+    conf.set(ConfVars.LOCALSCRATCHDIR.varname, localScratchDir.getAbsolutePath());
     conf.set(ConfVars.DYNAMICPARTITIONINGMODE.varname, "nonstrict");
 
     SessionState ss = new SessionState(conf);
@@ -450,7 +478,7 @@ public class HiveTestDataGenerator {
     // Add a partition with custom location
     executeQuery(hiveDriver,
         String.format("ALTER TABLE partition_pruning_test ADD PARTITION (c=99, d=98, e=97) LOCATION '%s'",
-            getTempDir("part1")));
+          part1Dir.getAbsolutePath()));
     executeQuery(hiveDriver,
         String.format("INSERT INTO TABLE partition_pruning_test PARTITION(c=99, d=98, e=97) " +
                 "SELECT '%s', '%s' FROM kv LIMIT 1",
@@ -490,35 +518,37 @@ public class HiveTestDataGenerator {
 
     // Create text tables with skip header and footer table property
     executeQuery(hiveDriver, "create database if not exists skipper");
-    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_text_small", "textfile", "1", "1"));
+    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_text_small", "textfile", "1", "1", false));
     executeQuery(hiveDriver, generateTestDataWithHeadersAndFooters("skipper.kv_text_small", 5, 1, 1));
 
-    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_text_large", "textfile", "2", "2"));
+    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_text_large", "textfile", "2", "2", false));
     executeQuery(hiveDriver, generateTestDataWithHeadersAndFooters("skipper.kv_text_large", 5000, 2, 2));
 
-    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_incorrect_skip_header", "textfile", "A", "1"));
+    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_incorrect_skip_header", "textfile", "A", "1", false));
     executeQuery(hiveDriver, generateTestDataWithHeadersAndFooters("skipper.kv_incorrect_skip_header", 5, 1, 1));
 
-    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_incorrect_skip_footer", "textfile", "1", "A"));
+    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_incorrect_skip_footer", "textfile", "1", "A", false));
     executeQuery(hiveDriver, generateTestDataWithHeadersAndFooters("skipper.kv_incorrect_skip_footer", 5, 1, 1));
 
-    // Create rcfile table with skip header and footer table property
-    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_rcfile_large", "rcfile", "1", "1"));
-    executeQuery(hiveDriver, "insert into table skipper.kv_rcfile_large select * from skipper.kv_text_large");
+    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_text_header_only", "textfile", "5", "0", false));
+    executeQuery(hiveDriver, generateTestDataWithHeadersAndFooters("skipper.kv_text_header_only", 0, 5, 0));
 
-    // Create parquet table with skip header and footer table property
-    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_parquet_large", "parquet", "1", "1"));
-    executeQuery(hiveDriver, "insert into table skipper.kv_parquet_large select * from skipper.kv_text_large");
+    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_text_footer_only", "textfile", "0", "5", false));
+    executeQuery(hiveDriver, generateTestDataWithHeadersAndFooters("skipper.kv_text_footer_only", 0, 0, 5));
 
-    // Create sequencefile table with skip header and footer table property
-    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_sequencefile_large", "sequencefile", "1", "1"));
-    executeQuery(hiveDriver, "insert into table skipper.kv_sequencefile_large select * from skipper.kv_text_large");
+    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_text_header_footer_only", "textfile", "5", "5", false));
+    executeQuery(hiveDriver, generateTestDataWithHeadersAndFooters("skipper.kv_text_header_footer_only", 0, 5, 5));
 
-      // Create a table based on json file
-      executeQuery(hiveDriver, "create table default.simple_json(json string)");
-      final String loadData = String.format("load data local inpath '" +
-          Resources.getResource("simple.json") + "' into table default.simple_json");
-      executeQuery(hiveDriver, loadData);
+    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("skipper.kv_text_with_part", "textfile", "5", "5", true));
+    executeQuery(hiveDriver, "insert overwrite table skipper.kv_text_with_part partition (part) " +
+    "select key, value, key % 2 as part from skipper.kv_text_large");
+
+    // Create a table based on json file
+    executeQuery(hiveDriver, "create table default.simple_json(json string)");
+    final String loadData = "load data local inpath '" +
+        Resources.getResource("simple.json") + "' into table default.simple_json";
+    executeQuery(hiveDriver, loadData);
+
     ss.close();
   }
 
@@ -576,23 +606,41 @@ public class HiveTestDataGenerator {
     return file.getPath();
   }
 
-  private String createTableWithHeaderFooterProperties(String tableName, String format, String headerValue, String footerValue) {
-    return String.format("create table %s (key int, value string) stored as %s tblproperties('%s'='%s', '%s'='%s')",
-        tableName, format, serdeConstants.HEADER_COUNT, headerValue, serdeConstants.FOOTER_COUNT, footerValue);
+  private String createTableWithHeaderFooterProperties(String tableName,
+                                                       String format,
+                                                       String headerValue,
+                                                       String footerValue,
+                                                       boolean hasPartitions) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("create table ").append(tableName);
+    sb.append(" (key int, value string) ");
+    if (hasPartitions) {
+      sb.append("partitioned by (part bigint) ");
+    }
+    sb.append(" stored as ").append(format);
+    sb.append(" tblproperties(");
+    sb.append("'").append(serdeConstants.HEADER_COUNT).append("'='").append(headerValue).append("'");
+    sb.append(",");
+    sb.append("'").append(serdeConstants.FOOTER_COUNT).append("'='").append(footerValue).append("'");
+    sb.append(")");
+
+    return sb.toString();
   }
 
   private String generateTestDataWithHeadersAndFooters(String tableName, int rowCount, int headerLines, int footerLines) {
     StringBuilder sb = new StringBuilder();
     sb.append("insert into table ").append(tableName).append(" (key, value) values ");
-    int length = sb.length();
     sb.append(StringUtils.repeat("('key_header', 'value_header')", ",", headerLines));
+    if (headerLines > 0) {
+      sb.append(",");
+    }
     for (int i  = 1; i <= rowCount; i++) {
-        sb.append(",(").append(i).append(",").append("'key_").append(i).append("')");
+        sb.append("(").append(i).append(",").append("'key_").append(i).append("'),");
     }
-    if (headerLines <= 0) {
-      sb.deleteCharAt(length);
+    if (footerLines <= 0) {
+      sb.deleteCharAt(sb.length() - 1);
     }
-    sb.append(StringUtils.repeat(",('key_footer', 'value_footer')", footerLines));
+    sb.append(StringUtils.repeat("('key_footer', 'value_footer')", ",", footerLines));
 
     return sb.toString();
   }

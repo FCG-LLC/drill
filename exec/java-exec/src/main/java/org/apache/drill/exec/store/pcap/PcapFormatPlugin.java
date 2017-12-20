@@ -34,12 +34,10 @@ import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 import org.apache.drill.exec.store.dfs.FormatMatcher;
 import org.apache.drill.exec.store.dfs.FormatSelection;
 import org.apache.drill.exec.store.dfs.MagicString;
-import org.apache.drill.exec.store.dfs.NamedFormatPluginConfig;
 import org.apache.drill.exec.store.dfs.easy.EasyFormatPlugin;
 import org.apache.drill.exec.store.dfs.easy.EasyWriter;
 import org.apache.drill.exec.store.dfs.easy.FileWork;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 import java.util.List;
@@ -66,8 +64,7 @@ public class PcapFormatPlugin extends EasyFormatPlugin<PcapFormatConfig> {
 
   @Override
   public RecordReader getRecordReader(FragmentContext context, DrillFileSystem dfs, FileWork fileWork, List<SchemaPath> columns, String userName) throws ExecutionSetupException {
-    String path = dfs.makeQualified(new Path(fileWork.getPath())).toUri().getPath();
-    return new PcapRecordReader(path, columns);
+    return new PcapRecordReader(fileWork.getPath(), dfs, columns);
   }
 
   @Override
@@ -101,13 +98,7 @@ public class PcapFormatPlugin extends EasyFormatPlugin<PcapFormatConfig> {
                                  FileSelection selection, FileSystemPlugin fsPlugin,
                                  String storageEngineName, String userName) throws IOException {
       if (isFileReadable(fs, selection.getFirstPath(fs))) {
-        if (plugin.getName() != null) {
-          NamedFormatPluginConfig namedConfig = new NamedFormatPluginConfig();
-          namedConfig.name = plugin.getName();
-          return new PcapDrillTable(storageEngineName, fsPlugin, userName, new FormatSelection(namedConfig, selection));
-        } else {
-          return new PcapDrillTable(storageEngineName, fsPlugin, userName, new FormatSelection(plugin.getConfig(), selection));
-        }
+        return new PcapDrillTable(storageEngineName, fsPlugin, userName, new FormatSelection(plugin.getConfig(), selection));
       }
       return null;
     }

@@ -151,6 +151,12 @@ public class MergeJoinBatch extends AbstractRecordBatch<MergeJoinPOP> {
       state = BatchState.OUT_OF_MEMORY;
       return;
     }
+
+    if (leftOutcome == IterOutcome.NONE && rightOutcome == IterOutcome.NONE) {
+      state = BatchState.DONE;
+      return;
+    }
+
     allocateBatch(true);
   }
 
@@ -265,10 +271,10 @@ public class MergeJoinBatch extends AbstractRecordBatch<MergeJoinPOP> {
 
   private JoinWorker generateNewWorker() throws ClassTransformationException, IOException, SchemaChangeException{
 
-    final ClassGenerator<JoinWorker> cg = CodeGenerator.getRoot(JoinWorker.TEMPLATE_DEFINITION, context.getFunctionRegistry(), context.getOptions());
+    final ClassGenerator<JoinWorker> cg = CodeGenerator.getRoot(JoinWorker.TEMPLATE_DEFINITION, context.getOptions());
     cg.getCodeGenerator().plainJavaCapable(true);
     // Uncomment out this line to debug the generated code.
-//    cg.getCodeGenerator().saveCodeForDebugging(true);
+    // cg.getCodeGenerator().saveCodeForDebugging(true);
     final ErrorCollector collector = new ErrorCollectorImpl();
 
     // Generate members and initialization code
@@ -400,7 +406,7 @@ public class MergeJoinBatch extends AbstractRecordBatch<MergeJoinPOP> {
           } else {
             outputType = inputType;
           }
-          MaterializedField newField = MaterializedField.create(w.getField().getPath(), outputType);
+          MaterializedField newField = MaterializedField.create(w.getField().getName(), outputType);
           ValueVector v = container.addOrGet(newField);
           if (v instanceof AbstractContainerVector) {
             w.getValueVector().makeTransferPair(v);
@@ -417,7 +423,7 @@ public class MergeJoinBatch extends AbstractRecordBatch<MergeJoinPOP> {
           } else {
             outputType = inputType;
           }
-          MaterializedField newField = MaterializedField.create(w.getField().getPath(), outputType);
+          MaterializedField newField = MaterializedField.create(w.getField().getName(), outputType);
           ValueVector v = container.addOrGet(newField);
           if (v instanceof AbstractContainerVector) {
             w.getValueVector().makeTransferPair(v);

@@ -40,7 +40,6 @@ import org.apache.drill.exec.proto.helper.QueryIdHelper;
 import org.apache.drill.exec.rpc.user.UserSession;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.server.QueryProfileStoreContext;
-import org.apache.drill.exec.server.options.OptionManager;
 import org.apache.drill.exec.server.options.OptionValue;
 import org.apache.drill.exec.server.options.QueryOptionManager;
 import org.apache.drill.exec.store.PartitionExplorer;
@@ -61,11 +60,11 @@ import io.netty.buffer.DrillBuf;
 // TODO - consider re-name to PlanningContext, as the query execution context actually appears
 // in fragment contexts
 public class QueryContext implements AutoCloseable, OptimizerRulesContext, SchemaConfigInfoProvider {
-  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(QueryContext.class);
 
   private final DrillbitContext drillbitContext;
   private final UserSession session;
-  private final OptionManager queryOptions;
+  private final QueryId queryId;
+  private final QueryOptionManager queryOptions;
   private final PlannerSettings plannerSettings;
   private final ExecutionControls executionControls;
 
@@ -88,6 +87,7 @@ public class QueryContext implements AutoCloseable, OptimizerRulesContext, Schem
   public QueryContext(final UserSession session, final DrillbitContext drillbitContext, QueryId queryId) {
     this.drillbitContext = drillbitContext;
     this.session = session;
+    this.queryId = queryId;
     queryOptions = new QueryOptionManager(session.getOptions());
     executionControls = new ExecutionControls(queryOptions, drillbitContext.getEndpoint());
     plannerSettings = new PlannerSettings(queryOptions, getFunctionRegistry());
@@ -119,14 +119,12 @@ public class QueryContext implements AutoCloseable, OptimizerRulesContext, Schem
     return plannerSettings;
   }
 
-  public UserSession getSession() {
-    return session;
-  }
+  public UserSession getSession() { return session; }
 
   @Override
-  public BufferAllocator getAllocator() {
-    return allocator;
-  }
+  public BufferAllocator getAllocator() { return allocator; }
+
+  public QueryId getQueryId( ) { return queryId; }
 
   /**
    * Return reference to default schema instance in a schema tree. Each {@link org.apache.calcite.schema.SchemaPlus}
@@ -165,14 +163,23 @@ public class QueryContext implements AutoCloseable, OptimizerRulesContext, Schem
   }
 
   /**
-   *  Create and return a SchemaTree with given <i>schemaConfig</i>.
+   *  Create and return a SchemaTree with given <i>schemaConfig</i> but some schemas (from storage plugins)
+   *  could be initialized later.
    * @param schemaConfig
    * @return
    */
   public SchemaPlus getRootSchema(SchemaConfig schemaConfig) {
     return schemaTreeProvider.createRootSchema(schemaConfig);
   }
+  /**
+   *  Create and return a fully initialized SchemaTree with given <i>schemaConfig</i>.
+   * @param schemaConfig
+   * @return
+   */
 
+  public SchemaPlus getFullRootSchema(SchemaConfig schemaConfig) {
+    return schemaTreeProvider.createFullRootSchema(schemaConfig);
+  }
   /**
    * Get the user name of the user who issued the query that is managed by this QueryContext.
    * @return
@@ -182,7 +189,7 @@ public class QueryContext implements AutoCloseable, OptimizerRulesContext, Schem
     return session.getCredentials().getUserName();
   }
 
-  public OptionManager getOptions() {
+  public QueryOptionManager getOptions() {
     return queryOptions;
   }
 
@@ -203,6 +210,10 @@ public class QueryContext implements AutoCloseable, OptimizerRulesContext, Schem
   }
 
   public Collection<DrillbitEndpoint> getActiveEndpoints() {
+    return drillbitContext.getBits();
+  }
+
+  public Collection<DrillbitEndpoint> getOnlineEndpoints() {
     return drillbitContext.getBits();
   }
 

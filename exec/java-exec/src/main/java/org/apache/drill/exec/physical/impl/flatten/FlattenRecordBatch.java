@@ -253,8 +253,7 @@ public class FlattenRecordBatch extends AbstractSingleRecordBatch<FlattenPOP> {
   }
 
   private FieldReference getRef(NamedExpression e) {
-    final FieldReference ref = e.getRef();
-    return ref;
+    return e.getRef();
   }
 
   /**
@@ -302,10 +301,10 @@ public class FlattenRecordBatch extends AbstractSingleRecordBatch<FlattenPOP> {
     final ErrorCollector collector = new ErrorCollectorImpl();
     final List<TransferPair> transfers = Lists.newArrayList();
 
-    final ClassGenerator<Flattener> cg = CodeGenerator.getRoot(Flattener.TEMPLATE_DEFINITION, context.getFunctionRegistry(), context.getOptions());
+    final ClassGenerator<Flattener> cg = CodeGenerator.getRoot(Flattener.TEMPLATE_DEFINITION, context.getOptions());
     cg.getCodeGenerator().plainJavaCapable(true);
     // Uncomment out this line to debug the generated code.
-//    cg.getCodeGenerator().saveCodeForDebugging(true);
+    // cg.getCodeGenerator().saveCodeForDebugging(true);
     final IntHashSet transferFieldIds = new IntHashSet();
 
     final NamedExpression flattenExpr = new NamedExpression(popConfig.getColumn(), new FieldReference(popConfig.getColumn()));
@@ -333,8 +332,7 @@ public class FlattenRecordBatch extends AbstractSingleRecordBatch<FlattenPOP> {
 
     ClassifierResult result = new ClassifierResult();
 
-    for (int i = 0; i < exprs.size(); i++) {
-      final NamedExpression namedExpression = exprs.get(i);
+    for (NamedExpression namedExpression : exprs) {
       result.clear();
 
       String outputName = getRef(namedExpression).getRootSegment().getPath();
@@ -408,10 +406,11 @@ public class FlattenRecordBatch extends AbstractSingleRecordBatch<FlattenPOP> {
 
     List<NamedExpression> exprs = Lists.newArrayList();
     for (MaterializedField field : incoming.getSchema()) {
-      if (field.getPath().equals(popConfig.getColumn().getAsUnescapedPath())) {
+      String fieldName = field.getName();
+      if (fieldName.equals(popConfig.getColumn().getRootSegmentPath())) {
         continue;
       }
-      exprs.add(new NamedExpression(SchemaPath.getSimplePath(field.getPath()), new FieldReference(field.getPath())));
+      exprs.add(new NamedExpression(SchemaPath.getSimplePath(fieldName), new FieldReference(fieldName)));
     }
     return exprs;
   }

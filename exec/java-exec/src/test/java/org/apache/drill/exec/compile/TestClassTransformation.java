@@ -19,7 +19,7 @@ package org.apache.drill.exec.compile;
 
 import java.io.IOException;
 
-import org.apache.drill.BaseTestQuery;
+import org.apache.drill.test.BaseTestQuery;
 import org.apache.drill.exec.compile.ClassTransformer.ClassSet;
 import org.apache.drill.exec.compile.sig.GeneratorMapping;
 import org.apache.drill.exec.compile.sig.MappingSet;
@@ -27,8 +27,6 @@ import org.apache.drill.exec.exception.ClassTransformationException;
 import org.apache.drill.exec.expr.ClassGenerator;
 import org.apache.drill.exec.expr.CodeGenerator;
 import org.apache.drill.exec.rpc.user.UserSession;
-import org.apache.drill.exec.server.options.OptionValue;
-import org.apache.drill.exec.server.options.OptionValue.OptionType;
 import org.apache.drill.exec.server.options.SessionOptionManager;
 import org.codehaus.commons.compiler.CompileException;
 import org.junit.Assert;
@@ -58,7 +56,7 @@ public class TestClassTransformation extends BaseTestQuery {
   @Test
   public void testJaninoClassCompiler() throws Exception {
     logger.debug("Testing JaninoClassCompiler");
-    sessionOptions.setOption(OptionValue.createString(OptionType.SESSION, ClassCompilerSelector.JAVA_COMPILER_OPTION, ClassCompilerSelector.CompilerPolicy.JANINO.name()));
+    sessionOptions.setLocalOption(ClassCompilerSelector.JAVA_COMPILER_OPTION, ClassCompilerSelector.CompilerPolicy.JANINO.name());
     for (int i = 0; i < ITERATION_COUNT; i++) {
       compilationInnerClass(false); // Traditional byte-code manipulation
       compilationInnerClass(true); // Plain-old Java
@@ -68,7 +66,7 @@ public class TestClassTransformation extends BaseTestQuery {
   @Test
   public void testJDKClassCompiler() throws Exception {
     logger.debug("Testing JDKClassCompiler");
-    sessionOptions.setOption(OptionValue.createString(OptionType.SESSION, ClassCompilerSelector.JAVA_COMPILER_OPTION, ClassCompilerSelector.CompilerPolicy.JDK.name()));
+    sessionOptions.setLocalOption(ClassCompilerSelector.JAVA_COMPILER_OPTION, ClassCompilerSelector.CompilerPolicy.JDK.name());
     for (int i = 0; i < ITERATION_COUNT; i++) {
       compilationInnerClass(false); // Traditional byte-code manipulation
       compilationInnerClass(true); // Plain-old Java
@@ -80,9 +78,9 @@ public class TestClassTransformation extends BaseTestQuery {
     CodeGenerator<ExampleInner> cg = newCodeGenerator(ExampleInner.class, ExampleTemplateWithInner.class);
     ClassSet classSet = new ClassSet(null, cg.getDefinition().getTemplateClassName(), cg.getMaterializedClassName());
     String sourceCode = cg.generateAndGet();
-    sessionOptions.setOption(OptionValue.createString(OptionType.SESSION, ClassCompilerSelector.JAVA_COMPILER_OPTION, ClassCompilerSelector.CompilerPolicy.JDK.name()));
+    sessionOptions.setLocalOption(ClassCompilerSelector.JAVA_COMPILER_OPTION, ClassCompilerSelector.CompilerPolicy.JDK.name());
 
-    sessionOptions.setOption(OptionValue.createBoolean(OptionType.SESSION, ClassCompilerSelector.JAVA_COMPILER_DEBUG_OPTION, false));
+    sessionOptions.setLocalOption(ClassCompilerSelector.JAVA_COMPILER_DEBUG_OPTION, false);
     @SuppressWarnings("resource")
     QueryClassLoader loader = new QueryClassLoader(config, sessionOptions);
     final byte[][] codeWithoutDebug = loader.getClassByteCode(classSet.generated, sourceCode);
@@ -92,7 +90,7 @@ public class TestClassTransformation extends BaseTestQuery {
       sizeWithoutDebug += bs.length;
     }
 
-    sessionOptions.setOption(OptionValue.createBoolean(OptionType.SESSION, ClassCompilerSelector.JAVA_COMPILER_DEBUG_OPTION, true));
+    sessionOptions.setLocalOption(ClassCompilerSelector.JAVA_COMPILER_DEBUG_OPTION, true);
     loader = new QueryClassLoader(config, sessionOptions);
     final byte[][] codeWithDebug = loader.getClassByteCode(classSet.generated, sourceCode);
     loader.close();
@@ -123,7 +121,7 @@ public class TestClassTransformation extends BaseTestQuery {
 
   private <T, X extends T> CodeGenerator<T> newCodeGenerator(Class<T> iface, Class<X> impl) {
     final TemplateClassDefinition<T> template = new TemplateClassDefinition<T>(iface, impl);
-    CodeGenerator<T> cg = CodeGenerator.get(template, getDrillbitContext().getFunctionImplementationRegistry(), getDrillbitContext().getOptionManager());
+    CodeGenerator<T> cg = CodeGenerator.get(template, getDrillbitContext().getOptionManager());
     cg.plainJavaCapable(true);
 
     ClassGenerator<T> root = cg.getRoot();

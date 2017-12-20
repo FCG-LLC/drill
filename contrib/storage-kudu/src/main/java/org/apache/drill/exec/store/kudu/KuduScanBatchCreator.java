@@ -58,7 +58,7 @@ public class KuduScanBatchCreator implements BatchCreator<KuduSubScan>{
       readers.add(KuduRecordReader.buildNoDataReader(subScan.getStorageEngine().getClient(), subScan.getTableName(), columns, context));
     }
 
-    return new ScanBatch(subScan, context, readers.iterator());
+    return new ScanBatch(subScan, context, readers);
   }
 
 }

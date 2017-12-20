@@ -329,7 +329,10 @@ public class DrillClient implements Closeable, ConnectionThrottle {
           throw new RpcException("Failure setting up ZK for client.", e);
         }
       }
-      endpoints.addAll(clusterCoordinator.getAvailableEndpoints());
+      // Gets the drillbit endpoints that are ONLINE and excludes the drillbits that are
+      // in QUIESCENT state. This avoids the clients connecting to drillbits that are
+      // shutting down thereby avoiding reducing the chances of query failures.
+      endpoints.addAll(clusterCoordinator.getOnlineEndPoints());
       // Make sure we have at least one endpoint in the list
       checkState(!endpoints.isEmpty(), "No active Drillbit endpoint found from ZooKeeper. Check connection parameters?");
     }
@@ -367,8 +370,12 @@ public class DrillClient implements Closeable, ConnectionThrottle {
     DrillbitEndpoint endpoint;
 
     while (triedEndpointIndex < connectTriesVal) {
-      client = new UserClient(clientName, config, supportComplexTypes, allocator, eventLoopGroup, executor);
       endpoint = endpoints.get(triedEndpointIndex);
+      // Note: the properties member is a DrillProperties instance which lower cases names of
+      // properties. That does not work too well with properties that are mixed case.
+      // For user client severla properties are mixed case so we do not use the properties member
+      // but instead pass the props parameter.
+      client = new UserClient(clientName, config, props, supportComplexTypes, allocator, eventLoopGroup, executor, endpoint);
       logger.debug("Connecting to server {}:{}", endpoint.getAddress(), endpoint.getUserPort());
 
       if (!properties.containsKey(DrillProperties.SERVICE_HOST)) {
@@ -414,7 +421,10 @@ public class DrillClient implements Closeable, ConnectionThrottle {
       retry--;
       try {
         Thread.sleep(this.reconnectDelay);
-        final ArrayList<DrillbitEndpoint> endpoints = new ArrayList<>(clusterCoordinator.getAvailableEndpoints());
+        // Gets the drillbit endpoints that are ONLINE and excludes the drillbits that are
+        // in QUIESCENT state. This avoids the clients connecting to drillbits that are
+        // shutting down thereby reducing the chances of query failures.
+        final ArrayList<DrillbitEndpoint> endpoints = new ArrayList<>(clusterCoordinator.getOnlineEndPoints());
         if (endpoints.isEmpty()) {
           continue;
         }
@@ -430,6 +440,7 @@ public class DrillClient implements Closeable, ConnectionThrottle {
 
   private void connect(DrillbitEndpoint endpoint) throws RpcException {
     client.connect(endpoint, properties, getUserCredentials());
+    logger.info("Foreman drillbit is {}", endpoint.getAddress());
   }
 
   public BufferAllocator getAllocator() {

@@ -20,7 +20,6 @@ package org.apache.drill.exec.server.options;
 /**
  * Immutable set of options accessible by name or validator.
  */
-
 public interface OptionSet {
 
   /**
@@ -36,6 +35,13 @@ public interface OptionSet {
    * @return the option value, null if the option does not exist
    */
   OptionValue getOption(String name);
+
+  /**
+   * Gets the default value for the specified option.
+   * @param optionName The option to retrieve the default value for.
+   * @return The default value for the option.
+   */
+  OptionValue getDefault(String optionName);
 
   /**
    * Gets the boolean value (from the option value) for the given boolean validator.
@@ -68,4 +74,48 @@ public interface OptionSet {
    * @return the string value
    */
   String getOption(TypeValidators.StringValidator validator);
+
+  /**
+   * Return the value of a Boolean option.
+   *
+   * @param name option name
+   * @return the Boolean value
+   * @throws IllegalArgumentException if the option is undefined or
+   * is not of the correct data type
+   */
+
+  boolean getBoolean(String name);
+
+  /**
+   * Return the value of a long option.
+   *
+   * @param name option name
+   * @return the long value
+   * @throws IllegalArgumentException if the option is undefined or
+   * is not of the correct data type
+   */
+
+  long getLong(String name);
+
+  /**
+   * Return the value of a double option.
+   *
+   * @param name option name
+   * @return the double value
+   * @throws IllegalArgumentException if the option is undefined or
+   * is not of the correct data type
+   */
+
+  double getDouble(String name);
+
+  /**
+   * Return the value of a String option.
+   *
+   * @param name option name
+   * @return the String value
+   * @throws IllegalArgumentException if the option is undefined or
+   * is not of the correct data type
+   */
+
+  String getString(String name);
 }

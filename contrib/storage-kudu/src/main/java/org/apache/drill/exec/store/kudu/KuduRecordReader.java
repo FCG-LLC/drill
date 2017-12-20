@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.SchemaPath;
@@ -59,6 +60,7 @@ import org.apache.kudu.Type;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduException;
 import org.apache.kudu.client.KuduScanner;
+import org.apache.kudu.client.KuduTable;
 import org.apache.kudu.client.RowResult;
 import org.apache.kudu.client.RowResultIterator;
 
@@ -119,8 +121,18 @@ public class KuduRecordReader extends AbstractRecordReader {
   public void setup(OperatorContext context, OutputMutator output) throws ExecutionSetupException {
     this.output = output;
     this.context = context;
-
     try {
+      KuduTable table = client.openTable(scanSpec.getTableName());
+
+      KuduScanner.KuduScannerBuilder builder = client.newScannerBuilder(table);
+      if (!isStarQuery()) {
+        List<String> colNames = Lists.newArrayList();
+        for (SchemaPath p : this.getColumns()) {
+          colNames.add(p.getRootSegmentPath());
+        }
+        builder.setProjectedColumnNames(colNames);
+      }
+
       context.getStats().startWait();
 
       try {
@@ -242,7 +254,7 @@ public class KuduRecordReader extends AbstractRecordReader {
         majorType = Types.required(minorType);
       }
       MaterializedField field = MaterializedField.create(name, majorType);
-      final Class<? extends ValueVector> clazz = (Class<? extends ValueVector>) TypeHelper.getValueVectorClass(
+      final Class<? extends ValueVector> clazz = TypeHelper.getValueVectorClass(
           minorType, majorType.getMode());
       ValueVector vector = output.addField(field, clazz);
       vector.setInitialCapacity(MAXIMUM_ROWS_SUPPORTED_IN_BATCH);

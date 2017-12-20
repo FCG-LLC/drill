@@ -17,13 +17,11 @@
  */
 package org.apache.drill.exec.hive;
 
-import mockit.Mock;
-import mockit.MockUp;
 import mockit.integration.junit4.JMockit;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import org.apache.calcite.util.Util;
-import org.apache.calcite.util.ConversionUtil;
+import org.apache.drill.categories.HiveStorageTest;
+import org.apache.drill.categories.SlowTest;
 import org.apache.drill.common.exceptions.UserRemoteException;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
@@ -34,10 +32,10 @@ import org.joda.time.DateTime;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 
 import java.math.BigDecimal;
-import java.nio.charset.Charset;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.util.List;
@@ -51,12 +49,12 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(JMockit.class)
+@Category({SlowTest.class, HiveStorageTest.class})
 public class TestHiveStorage extends HiveTestBase {
   @BeforeClass
   public static void setupOptions() throws Exception {
     test(String.format("alter session set `%s` = true", PlannerSettings.ENABLE_DECIMAL_DATA_TYPE_KEY));
   }
-
 
   @Test // DRILL-4083
   public void testNativeScanWhenNoColumnIsRead() throws Exception {
@@ -70,12 +68,11 @@ public class TestHiveStorage extends HiveTestBase {
           .sqlQuery(query)
           .unOrdered()
           .baselineColumns("col")
-          .baselineValues(200l)
+          .baselineValues(200L)
           .go();
     } finally {
-      test(String.format("alter session set `%s` = %s",
-          ExecConstants.HIVE_OPTIMIZE_SCAN_WITH_NATIVE_READERS,
-              ExecConstants.HIVE_OPTIMIZE_SCAN_WITH_NATIVE_READERS_VALIDATOR.getDefault().bool_val ? "true" : "false"));
+      test("alter session reset `%s`",
+          ExecConstants.HIVE_OPTIMIZE_SCAN_WITH_NATIVE_READERS);
     }
   }
 
@@ -495,33 +492,43 @@ public class TestHiveStorage extends HiveTestBase {
     }
   }
 
-  @Test // DRILL-3688
-  public void testIgnoreSkipHeaderFooterForRcfile() throws Exception {
+  @Test
+  public void testTableWithHeaderOnly() throws Exception {
     testBuilder()
-        .sqlQuery("select count(1) as cnt from hive.skipper.kv_rcfile_large")
+        .sqlQuery("select count(1) as cnt from hive.skipper.kv_text_header_only")
         .unOrdered()
         .baselineColumns("cnt")
-        .baselineValues(5000L)
+        .baselineValues(0L)
         .go();
   }
 
-  @Test // DRILL-3688
-  public void testIgnoreSkipHeaderFooterForParquet() throws Exception {
+  @Test
+  public void testTableWithFooterOnly() throws Exception {
     testBuilder()
-        .sqlQuery("select count(1) as cnt from hive.skipper.kv_parquet_large")
+        .sqlQuery("select count(1) as cnt from hive.skipper.kv_text_footer_only")
         .unOrdered()
         .baselineColumns("cnt")
-        .baselineValues(5000L)
+        .baselineValues(0L)
         .go();
   }
 
-  @Test // DRILL-3688
-  public void testIgnoreSkipHeaderFooterForSequencefile() throws Exception {
+  @Test
+  public void testTableWithHeaderFooterOnly() throws Exception {
     testBuilder()
-        .sqlQuery("select count(1) as cnt from hive.skipper.kv_sequencefile_large")
+        .sqlQuery("select count(1) as cnt from hive.skipper.kv_text_header_footer_only")
         .unOrdered()
         .baselineColumns("cnt")
-        .baselineValues(5000L)
+        .baselineValues(0L)
+        .go();
+  }
+
+  @Test
+  public void testSkipHeaderFooterForPartitionedTable() throws Exception {
+    testBuilder()
+        .sqlQuery("select count(1) as cnt from hive.skipper.kv_text_with_part")
+        .unOrdered()
+        .baselineColumns("cnt")
+        .baselineValues(4980L)
         .go();
   }
 
@@ -548,15 +555,6 @@ public class TestHiveStorage extends HiveTestBase {
 
   @Test // DRILL-3250
   public void testNonAsciiStringLiterals() throws Exception {
-    // mock calcite util method to return utf charset
-    // instead of setting saffron.default.charset at system level
-    new MockUp<Util>() {
-      @Mock
-      Charset getDefaultCharset() {
-        return Charset.forName(ConversionUtil.NATIVE_UTF16_CHARSET_NAME);
-      }
-    };
-
     testBuilder()
         .sqlQuery("select * from hive.empty_table where b = 'Абвгде谢谢'")
         .expectsEmptyResultSet()

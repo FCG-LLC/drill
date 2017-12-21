@@ -122,7 +122,8 @@ public class KuduRecordReader extends AbstractRecordReader {
     this.output = output;
     this.context = context;
     try {
-      KuduTable table = client.openTable(scanSpec.getTableName());
+      String tableName = scanSpec != null ? scanSpec.getTableName() : this.tableName;
+      KuduTable table = client.openTable(tableName);
 
       KuduScanner.KuduScannerBuilder builder = client.newScannerBuilder(table);
       if (!isStarQuery()) {

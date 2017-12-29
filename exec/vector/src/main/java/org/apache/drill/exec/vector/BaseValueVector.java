@@ -19,6 +19,7 @@ package org.apache.drill.exec.vector;
 
 import io.netty.buffer.DrillBuf;
 
+import java.util.Collections;
 import java.util.Iterator;
 
 import com.google.common.base.Preconditions;
@@ -30,8 +31,6 @@ import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.TransferPair;
 
 public abstract class BaseValueVector implements ValueVector {
-//  private static final Logger logger = LoggerFactory.getLogger(BaseValueVector.class);
-
   /**
    * Physical maximum allocation. This is the value prior to Drill 1.11.
    * This size causes memory fragmentation. Please use
@@ -70,13 +69,13 @@ public abstract class BaseValueVector implements ValueVector {
     return field;
   }
 
-  public MaterializedField getField(String ref){
+  public MaterializedField getField(String ref) {
     return getField().withPath(ref);
   }
 
   @Override
   public TransferPair getTransferPair(BufferAllocator allocator) {
-    return getTransferPair(getField().getPath(), allocator);
+    return getTransferPair(getField().getName(), allocator);
   }
 
   @Override
@@ -116,7 +115,7 @@ public abstract class BaseValueVector implements ValueVector {
 
   @Override
   public Iterator<ValueVector> iterator() {
-    return Iterators.emptyIterator();
+    return Collections.emptyIterator();
   }
 
   public static boolean checkBufRefs(final ValueVector vv) {
@@ -132,6 +131,23 @@ public abstract class BaseValueVector implements ValueVector {
   @Override
   public BufferAllocator getAllocator() {
     return allocator;
+  }
+
+  public static void fillBitsVector(UInt1Vector bits, int valueCount) {
+
+    // Create a new bits vector, all values non-null
+
+    bits.allocateNew(valueCount);
+    UInt1Vector.Mutator bitsMutator = bits.getMutator();
+    for (int i = 0; i < valueCount; i++) {
+      bitsMutator.set(i, 1);
+    }
+    bitsMutator.setValueCount(valueCount);
+  }
+
+  @Override
+  public void toNullable(ValueVector nullableVector) {
+    throw new UnsupportedOperationException();
   }
 }
 

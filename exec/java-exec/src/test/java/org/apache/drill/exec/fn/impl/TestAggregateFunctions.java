@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,22 +20,35 @@ package org.apache.drill.exec.fn.impl;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.drill.BaseTestQuery;
+import org.apache.drill.test.BaseTestQuery;
+import org.apache.drill.categories.OperatorTest;
 import org.apache.drill.PlanTestBase;
+import org.apache.drill.categories.PlannerTest;
+import org.apache.drill.categories.SqlFunctionTest;
+import org.apache.drill.categories.UnlikelyTest;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.types.TypeProtos;
-import org.apache.drill.common.util.TestTools;
 import org.apache.drill.exec.proto.UserBitShared;
 import org.apache.drill.exec.rpc.user.QueryDataBatch;
+import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
+@Category({SqlFunctionTest.class, OperatorTest.class, PlannerTest.class})
 public class TestAggregateFunctions extends BaseTestQuery {
 
-  private static final String TEST_RES_PATH =   TestTools.getWorkingPath() + "/src/test/resources";
+  @BeforeClass
+  public static void setupFiles() {
+    dirTestWatcher.copyResourceToRoot(Paths.get("agg"));
+  }
 
   /*
    * Test checks the count of a nullable column within a map
@@ -45,7 +58,7 @@ public class TestAggregateFunctions extends BaseTestQuery {
   @Test
   public void testCountOnNullableColumn() throws Exception {
     testBuilder()
-        .sqlQuery("select count(t.x.y)  as cnt1, count(`integer`) as cnt2 from cp.`/jsoninput/input2.json` t")
+        .sqlQuery("select count(t.x.y)  as cnt1, count(`integer`) as cnt2 from cp.`jsoninput/input2.json` t")
         .ordered()
         .baselineColumns("cnt1", "cnt2")
         .baselineValues(3l, 4l)
@@ -110,6 +123,7 @@ public class TestAggregateFunctions extends BaseTestQuery {
   }
 
   @Test // DRILL-2170: Subquery has group-by, order-by on aggregate function and limit
+  @Category(UnlikelyTest.class)
   public void testDrill2170() throws Exception {
     String query =
         "select count(*) as cnt from "
@@ -129,6 +143,7 @@ public class TestAggregateFunctions extends BaseTestQuery {
   }
 
   @Test // DRILL-2168
+  @Category(UnlikelyTest.class)
   public void testGBExprWithDrillFunc() throws Exception {
     testBuilder()
         .ordered()
@@ -145,6 +160,7 @@ public class TestAggregateFunctions extends BaseTestQuery {
   }
 
   @Test //DRILL-2242
+  @Category(UnlikelyTest.class)
   public void testDRILLNestedGBWithSubsetKeys() throws Exception {
     String sql = " select count(*) as cnt from (select l_partkey from\n" +
         "   (select l_partkey, l_suppkey from cp.`tpch/lineitem.parquet`\n" +
@@ -340,23 +356,23 @@ public class TestAggregateFunctions extends BaseTestQuery {
    */
   @Test
   public void drill3069() throws Exception {
-    final String query = "select max(foo) col1 from dfs_test.`%s/agg/bugs/drill3069` where foo = %d";
+    final String query = "select max(foo) col1 from dfs.`agg/bugs/drill3069` where foo = %d";
     testBuilder()
-        .sqlQuery(String.format(query, TEST_RES_PATH, 2))
+        .sqlQuery(query, 2)
         .unOrdered()
         .baselineColumns("col1")
         .baselineValues(2l)
         .go();
 
     testBuilder()
-        .sqlQuery(String.format(query, TEST_RES_PATH, 4))
+        .sqlQuery(query, 4)
         .unOrdered()
         .baselineColumns("col1")
         .baselineValues(4l)
         .go();
 
     testBuilder()
-        .sqlQuery(String.format(query, TEST_RES_PATH, 6))
+        .sqlQuery(query, 6)
         .unOrdered()
         .baselineColumns("col1")
         .baselineValues(6l)
@@ -364,6 +380,7 @@ public class TestAggregateFunctions extends BaseTestQuery {
   }
 
   @Test //DRILL-2748
+  @Category(UnlikelyTest.class)
   public void testPushFilterPastAgg() throws Exception {
     final String query =
         " select cnt " +
@@ -439,6 +456,7 @@ public class TestAggregateFunctions extends BaseTestQuery {
   }
 
   @Test // DRILL-3781
+  @Category(UnlikelyTest.class)
   // GROUP BY System functions in schema table.
   public void testGroupBySystemFuncSchemaTable() throws Exception {
     final String query = "select count(*) as cnt from sys.version group by CURRENT_DATE";
@@ -449,27 +467,25 @@ public class TestAggregateFunctions extends BaseTestQuery {
   }
 
   @Test //DRILL-3781
+  @Category(UnlikelyTest.class)
   // GROUP BY System functions in csv, parquet, json table.
   public void testGroupBySystemFuncFileSystemTable() throws Exception {
-    final String query = String.format("select count(*) as cnt from dfs_test.`%s/nation/nation.tbl` group by CURRENT_DATE", TEST_RES_PATH);
     testBuilder()
-        .sqlQuery(query)
+        .sqlQuery("select count(*) as cnt from cp.`nation/nation.tbl` group by CURRENT_DATE")
         .unOrdered()
         .baselineColumns("cnt")
         .baselineValues(25l)
         .build().run();
 
-    final String query2 = "select count(*) as cnt from cp.`tpch/nation.parquet` group by CURRENT_DATE";
     testBuilder()
-        .sqlQuery(query2)
+        .sqlQuery("select count(*) as cnt from cp.`tpch/nation.parquet` group by CURRENT_DATE")
         .unOrdered()
         .baselineColumns("cnt")
         .baselineValues(25l)
         .build().run();
 
-    final String query3 = "select count(*) as cnt from cp.`employee.json` group by CURRENT_DATE";
     testBuilder()
-        .sqlQuery(query3)
+        .sqlQuery("select count(*) as cnt from cp.`employee.json` group by CURRENT_DATE")
         .unOrdered()
         .baselineColumns("cnt")
         .baselineValues(1155l)
@@ -478,7 +494,7 @@ public class TestAggregateFunctions extends BaseTestQuery {
 
   @Test
   public void test4443() throws Exception {
-    test("SELECT MIN(columns[1]) FROM dfs_test.`%s/agg/4443.csv` GROUP BY columns[0]", TEST_RES_PATH);
+    test("SELECT MIN(columns[1]) FROM cp.`agg/4443.csv` GROUP BY columns[0]");
   }
 
   @Test
@@ -508,6 +524,7 @@ public class TestAggregateFunctions extends BaseTestQuery {
 
 
   @Test // DRILL-4531
+  @Category(UnlikelyTest.class)
   public void testPushFilterDown() throws Exception {
     final String sql =
         "SELECT  cust.custAddress, \n"
@@ -540,6 +557,7 @@ public class TestAggregateFunctions extends BaseTestQuery {
   }
 
   @Test // DRILL-2385: count on complex objects failed with missing function implementation
+  @Category(UnlikelyTest.class)
   public void testCountComplexObjects() throws Exception {
     final String query = "select count(t.%s) %s from cp.`complex/json/complex.json` t";
     Map<String, String> objectsMap = Maps.newHashMap();
@@ -570,4 +588,24 @@ public class TestAggregateFunctions extends BaseTestQuery {
     }
   }
 
+  @Test // DRILL-4264
+  @Category(UnlikelyTest.class)
+  public void testCountOnFieldWithDots() throws Exception {
+    String fileName = "table.json";
+    try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(dirTestWatcher.getRootDir(), fileName)))) {
+      writer.write("{\"rk.q\": \"a\", \"m\": {\"a.b\":\"1\", \"a\":{\"b\":\"2\"}, \"c\":\"3\"}}");
+    }
+
+    testBuilder()
+      .sqlQuery("select count(t.m.`a.b`) as a,\n" +
+        "count(t.m.a.b) as b,\n" +
+        "count(t.m['a.b']) as c,\n" +
+        "count(t.rk.q) as d,\n" +
+        "count(t.`rk.q`) as e\n" +
+        "from dfs.`%s` t", fileName)
+      .unOrdered()
+      .baselineColumns("a", "b", "c", "d", "e")
+      .baselineValues(1L, 1L, 1L, 0L, 1L)
+      .go();
+  }
 }

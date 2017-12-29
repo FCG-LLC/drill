@@ -75,6 +75,9 @@ public class HBaseRecordReader extends AbstractRecordReader implements DrillHBas
 
   private TableName hbaseTableName;
   private Scan hbaseScan;
+  // scan instance to capture columns for vector creation
+  private Scan hbaseScanColumnsOnly;
+  private Set<String> completeFamilies;
   private OperatorContext operatorContext;
 
   private boolean rowKeyOnly;
@@ -87,6 +90,7 @@ public class HBaseRecordReader extends AbstractRecordReader implements DrillHBas
     hbaseTableName = TableName.valueOf(
         Preconditions.checkNotNull(subScanSpec, "HBase reader needs a sub-scan spec").getTableName());
     hbaseScan = new Scan(subScanSpec.getStartRow(), subScanSpec.getStopRow());
+    hbaseScanColumnsOnly = new Scan();
     hbaseScan
         .setFilter(subScanSpec.getScanFilter())
         .setCaching(TARGET_RECORD_COUNT);
@@ -94,9 +98,22 @@ public class HBaseRecordReader extends AbstractRecordReader implements DrillHBas
     setColumns(projectedColumns);
   }
 
+  /**
+   * Provides the projected columns information to the Hbase Scan instance. If the
+   * projected columns list contains a column family and also a column in the
+   * column family, only the column family is passed to the Scan instance.
+   *
+   * For example, if the projection list is {cf1, cf1.col1, cf2.col1} then we only
+   * pass {cf1, cf2.col1} to the Scan instance.
+   *
+   * @param columns collection of projected columns
+   * @return collection of projected column family names
+   */
   @Override
   protected Collection<SchemaPath> transformColumns(Collection<SchemaPath> columns) {
     Set<SchemaPath> transformed = Sets.newLinkedHashSet();
+    completeFamilies = Sets.newHashSet();
+
     rowKeyOnly = true;
     if (!isStarQuery()) {
       for (SchemaPath column : columns) {
@@ -111,11 +128,16 @@ public class HBaseRecordReader extends AbstractRecordReader implements DrillHBas
         PathSegment child = root.getChild();
         if (child != null && child.isNamed()) {
           byte[] qualifier = child.getNameSegment().getPath().getBytes();
-          hbaseScan.addColumn(family, qualifier);
+          hbaseScanColumnsOnly.addColumn(family, qualifier);
+          if (!completeFamilies.contains(root.getPath())) {
+            hbaseScan.addColumn(family, qualifier);
+          }
         } else {
           hbaseScan.addFamily(family);
+          completeFamilies.add(root.getPath());
         }
       }
+
       /* if only the row key was requested, add a FirstKeyOnlyFilter to the scan
        * to fetch only one KV from each row. If a filter is already part of this
        * scan, add the FirstKeyOnlyFilter as the LAST filter of a MUST_PASS_ALL
@@ -129,7 +151,6 @@ public class HBaseRecordReader extends AbstractRecordReader implements DrillHBas
       rowKeyOnly = false;
       transformed.add(ROW_KEY_PATH);
     }
-
 
     return transformed;
   }
@@ -154,11 +175,10 @@ public class HBaseRecordReader extends AbstractRecordReader implements DrillHBas
         }
       }
 
-      // Add map and child vectors for any HBase column families and/or HBase
-      // columns that are requested (in order to avoid later creation of dummy
-      // NullableIntVectors for them).
+      // Add map and child vectors for any HBase columns that are requested (in
+      // order to avoid later creation of dummy NullableIntVectors for them).
       final Set<Map.Entry<byte[], NavigableSet<byte []>>> familiesEntries =
-          hbaseScan.getFamilyMap().entrySet();
+          hbaseScanColumnsOnly.getFamilyMap().entrySet();
       for (Map.Entry<byte[], NavigableSet<byte []>> familyEntry : familiesEntries) {
         final String familyName = new String(familyEntry.getKey(),
                                              StandardCharsets.UTF_8);
@@ -172,6 +192,12 @@ public class HBaseRecordReader extends AbstractRecordReader implements DrillHBas
           }
         }
       }
+
+      // Add map vectors for any HBase column families that are requested.
+      for (String familyName : completeFamilies) {
+        getOrCreateFamilyVector(familyName, false);
+      }
+
       resultScanner = hTable.getScanner(hbaseScan);
     } catch (SchemaChangeException | IOException e) {
       throw new ExecutionSetupException(e);

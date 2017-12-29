@@ -21,9 +21,15 @@ import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.UUID;
 
+import javax.net.ssl.SSLEngine;
 import javax.security.sasl.SaslException;
 
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelPipeline;
+import io.netty.handler.ssl.SslHandler;
 import org.apache.drill.common.config.DrillProperties;
+import org.apache.drill.common.exceptions.DrillException;
+import org.apache.drill.exec.ssl.SSLConfig;
 import org.apache.drill.exec.exception.DrillbitStartupException;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.physical.impl.materialize.QueryWritableBatch;
@@ -53,6 +59,7 @@ import org.apache.drill.exec.rpc.security.plain.PlainFactory;
 import org.apache.drill.exec.rpc.user.UserServer.BitToUserConnection;
 import org.apache.drill.exec.rpc.user.security.UserAuthenticationException;
 import org.apache.drill.exec.server.BootStrapContext;
+import org.apache.drill.exec.ssl.SSLConfigBuilder;
 import org.apache.drill.exec.work.user.UserWorker;
 import org.apache.hadoop.security.HadoopKerberosName;
 import org.slf4j.Logger;
@@ -71,6 +78,8 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
   private static final String SERVER_NAME = "Apache Drill Server";
 
   private final UserConnectionConfig config;
+  private final SSLConfig sslConfig;
+  private Channel sslChannel;
   private final UserWorker userWorker;
 
   public UserServer(BootStrapContext context, BufferAllocator allocator, EventLoopGroup eventLoopGroup,
@@ -79,10 +88,49 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
         allocator.getAsByteBufAllocator(),
         eventLoopGroup);
     this.config = new UserConnectionConfig(allocator, context, new UserServerRequestHandler(worker));
+    this.sslChannel = null;
+    try {
+      this.sslConfig = new SSLConfigBuilder()
+          .config(context.getConfig())
+          .mode(SSLConfig.Mode.SERVER)
+          .initializeSSLContext(true)
+          .validateKeyStore(true)
+          .build();
+    } catch (DrillException e) {
+      throw new DrillbitStartupException(e.getMessage(), e.getCause());
+    }
     this.userWorker = worker;
 
     // Initialize Singleton instance of UserRpcMetrics.
     ((UserRpcMetrics)UserRpcMetrics.getInstance()).initialize(config.isEncryptionEnabled(), allocator);
+  }
+
+  @Override
+  protected void setupSSL(ChannelPipeline pipe) {
+
+    SSLEngine sslEngine = sslConfig.createSSLEngine(config.getAllocator(), null, 0);
+    // Add SSL handler into pipeline
+    pipe.addFirst(RpcConstants.SSL_HANDLER, new SslHandler(sslEngine));
+    logger.debug("SSL communication between client and server is enabled.");
+    logger.debug(sslConfig.toString());
+
+  }
+
+  @Override
+  protected boolean isSslEnabled() {
+    return sslConfig.isUserSslEnabled();
+  }
+
+  @Override
+  public void setSslChannel(Channel c) {
+    sslChannel = c;
+  }
+
+  @Override
+  protected void closeSSL(){
+    if(isSslEnabled() && sslChannel != null){
+      sslChannel.close();
+    }
   }
 
   @Override
@@ -110,6 +158,11 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
           ? config.getMessageHandler()
           : new ServerAuthenticationHandler<>(config.getMessageHandler(),
           RpcType.SASL_MESSAGE_VALUE, RpcType.SASL_MESSAGE));
+
+      // Increase the connection count here since at this point it means that we already have the TCP connection.
+      // Later when connection fails for any reason then we will decrease the counter based on Netty's connection close
+      // handler.
+      incConnectionCounter();
     }
 
     void disableReadTimeout() {
@@ -150,10 +203,6 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
       if (config.getImpersonationManager() != null && targetName != null) {
         config.getImpersonationManager().replaceUserOnSession(targetName, session);
       }
-
-      // Increase the corresponding connection counter.
-      // For older clients we call this method directly.
-      incConnectionCounter();
     }
 
     @Override
@@ -272,13 +321,17 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
             return respBuilder.build();
           }
 
-          final boolean clientSupportsSasl = inbound.hasSaslSupport() &&
-              (inbound.getSaslSupport().ordinal() > SaslSupport.UNKNOWN_SASL_SUPPORT.ordinal());
+          // If sasl_support field is absent in handshake message then treat the client as < 1.10 client
+          final boolean clientSupportsSasl = inbound.hasSaslSupport();
 
+          // saslSupportOrdinal will be set to UNKNOWN_SASL_SUPPORT, if sasl_support field in handshake is set to a
+          // value which is unknown to this server. We will treat those clients as one which knows SASL protocol.
           final int saslSupportOrdinal = (clientSupportsSasl) ? inbound.getSaslSupport().ordinal()
                                                               : SaslSupport.UNKNOWN_SASL_SUPPORT.ordinal();
 
-          if (saslSupportOrdinal <= SaslSupport.SASL_AUTH.ordinal() && config.isEncryptionEnabled()) {
+          // Check if client doesn't support SASL or only supports SASL_AUTH and server has encryption enabled
+          if ((!clientSupportsSasl || saslSupportOrdinal == SaslSupport.SASL_AUTH.ordinal())
+              && config.isEncryptionEnabled()) {
             throw new UserAuthenticationException("The server doesn't allow client without encryption support." +
                 " Please upgrade your client or talk to your system administrator.");
           }

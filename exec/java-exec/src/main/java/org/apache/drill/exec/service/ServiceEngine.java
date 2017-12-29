@@ -35,6 +35,7 @@ import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.exception.DrillbitStartupException;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
+import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint.State;
 import org.apache.drill.exec.rpc.TransportCheck;
 import org.apache.drill.exec.rpc.control.Controller;
 import org.apache.drill.exec.rpc.control.ControllerImpl;
@@ -60,6 +61,8 @@ public class ServiceEngine implements AutoCloseable {
   private final BufferAllocator userAllocator;
   private final BufferAllocator controlAllocator;
   private final BufferAllocator dataAllocator;
+
+  private int userPort;
 
   public ServiceEngine(final WorkManager manager, final BootStrapContext context,
                        final boolean allowPortHunting, final boolean isDistributedMode)
@@ -95,15 +98,20 @@ public class ServiceEngine implements AutoCloseable {
       throw new DrillbitStartupException("Drillbit is disallowed to bind to loopback address in distributed mode.");
     }
 
-    final int userPort = userServer.bind(intialUserPort, allowPortHunting);
+    userPort = userServer.bind(intialUserPort, allowPortHunting);
     DrillbitEndpoint partialEndpoint = DrillbitEndpoint.newBuilder()
         .setAddress(hostName)
         .setUserPort(userPort)
         .setVersion(DrillVersionInfo.getVersion())
+        .setState(State.STARTUP)
         .build();
 
     partialEndpoint = controller.start(partialEndpoint, allowPortHunting);
     return dataPool.start(partialEndpoint, allowPortHunting);
+  }
+
+  public int getUserPort() {
+    return userPort;
   }
 
   public DataConnectionCreator getDataConnectionCreator(){

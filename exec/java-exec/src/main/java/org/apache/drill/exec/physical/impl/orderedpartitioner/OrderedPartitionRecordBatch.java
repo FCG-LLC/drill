@@ -420,22 +420,20 @@ public class OrderedPartitionRecordBatch extends AbstractRecordBatch<OrderedPart
   private SampleCopier getCopier(SelectionVector4 sv4, VectorContainer incoming, VectorContainer outgoing,
       List<Ordering> orderings, List<ValueVector> localAllocationVectors) throws SchemaChangeException {
     final ErrorCollector collector = new ErrorCollectorImpl();
-    final ClassGenerator<SampleCopier> cg = CodeGenerator.getRoot(SampleCopier.TEMPLATE_DEFINITION,
-        context.getFunctionRegistry(), context.getOptions());
+    final ClassGenerator<SampleCopier> cg = CodeGenerator.getRoot(SampleCopier.TEMPLATE_DEFINITION, context.getOptions());
     // Note: disabled for now. This may require some debugging:
     // no tests are available for this operator.
-//    cg.getCodeGenerator().plainOldJavaCapable(true);
+    // cg.getCodeGenerator().plainOldJavaCapable(true);
     // Uncomment out this line to debug the generated code.
-//    cg.getCodeGenerator().saveCodeForDebugging(true);
+    // cg.getCodeGenerator().saveCodeForDebugging(true);
 
     int i = 0;
     for (Ordering od : orderings) {
       final LogicalExpression expr = ExpressionTreeMaterializer.materialize(od.getExpr(), incoming, collector, context.getFunctionRegistry());
-      SchemaPath schemaPath = SchemaPath.getSimplePath("f" + i++);
       TypeProtos.MajorType.Builder builder = TypeProtos.MajorType.newBuilder().mergeFrom(expr.getMajorType())
           .clearMode().setMode(TypeProtos.DataMode.REQUIRED);
       TypeProtos.MajorType newType = builder.build();
-      MaterializedField outputField = MaterializedField.create(schemaPath.getAsUnescapedPath(), newType);
+      MaterializedField outputField = MaterializedField.create("f" + i++, newType);
       if (collector.hasErrors()) {
         throw new SchemaChangeException(String.format(
             "Failure while trying to materialize incoming schema.  Errors:\n %s.", collector.toErrorString()));
@@ -533,7 +531,7 @@ public class OrderedPartitionRecordBatch extends AbstractRecordBatch<OrderedPart
     // if this now that all the batches on the queue are processed, we begin processing the incoming batches. For the
     // first one
     // we need to generate a new schema, even if the outcome is IterOutcome.OK After that we can reuse the schema.
-    if (this.startedUnsampledBatches == false) {
+    if (!this.startedUnsampledBatches) {
       this.startedUnsampledBatches = true;
       if (upstream == IterOutcome.OK) {
         upstream = IterOutcome.OK_NEW_SCHEMA;
@@ -593,7 +591,7 @@ public class OrderedPartitionRecordBatch extends AbstractRecordBatch<OrderedPart
     final List<TransferPair> transfers = Lists.newArrayList();
 
     final ClassGenerator<OrderedPartitionProjector> cg = CodeGenerator.getRoot(
-        OrderedPartitionProjector.TEMPLATE_DEFINITION, context.getFunctionRegistry(), context.getOptions());
+        OrderedPartitionProjector.TEMPLATE_DEFINITION, context.getOptions());
     // Note: disabled for now. This may require some debugging:
     // no tests are available for this operator.
 //    cg.getCodeGenerator().plainOldJavaCapable(true);

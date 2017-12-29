@@ -2,8 +2,8 @@ package org.apache.drill.store.kudu;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.Files;
-import org.apache.drill.BaseTestQuery;
-import org.apache.drill.common.util.FileUtils;
+import org.apache.drill.test.BaseTestQuery;
+import org.apache.drill.common.util.DrillFileUtils;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.rpc.user.QueryDataBatch;
 import org.apache.drill.exec.store.StoragePluginRegistry;
@@ -98,7 +98,7 @@ public class BaseKuduTest extends BaseTestQuery {
     }
 
     protected String getPlanText(String planFile, String tableName) throws IOException {
-        return Files.toString(FileUtils.getResourceAsFile(planFile), Charsets.UTF_8)
+        return Files.toString(DrillFileUtils.getResourceAsFile(planFile), Charsets.UTF_8)
                 .replace("[TABLE_NAME]", "kudu."+tableName);
     }
 

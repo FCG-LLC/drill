@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/assign.hpp>
+#include "drill/userProperties.hpp"
 #include "saslAuthenticatorImpl.hpp"
 
 #include "drillClientImpl.hpp"
@@ -27,16 +28,16 @@
 
 namespace Drill {
 
-static const std::string DEFAULT_SERVICE_NAME = "drill";
+const std::string DEFAULT_SERVICE_NAME = "drill";
+const int PREFERRED_MIN_SSF = 56;
+const std::string SaslAuthenticatorImpl::KERBEROS_SIMPLE_NAME = "kerberos";
+const std::string SaslAuthenticatorImpl::PLAIN_NAME = "plain";
 
-static const std::string KERBEROS_SIMPLE_NAME = "kerberos";
-static const std::string KERBEROS_SASL_NAME = "gssapi";
-static const std::string PLAIN_NAME = "plain";
-static const int PREFERRED_MIN_SSF = 56;
+const std::string KERBEROS_SASL_NAME = "gssapi";
 
 const std::map<std::string, std::string> SaslAuthenticatorImpl::MECHANISM_MAPPING = boost::assign::map_list_of
-    (KERBEROS_SIMPLE_NAME, KERBEROS_SASL_NAME)
-    (PLAIN_NAME, PLAIN_NAME)
+    (SaslAuthenticatorImpl::KERBEROS_SIMPLE_NAME, KERBEROS_SASL_NAME)
+    (SaslAuthenticatorImpl::PLAIN_NAME, SaslAuthenticatorImpl::PLAIN_NAME)
 ;
 
 boost::mutex SaslAuthenticatorImpl::s_mutex;
@@ -123,10 +124,11 @@ int SaslAuthenticatorImpl::init(const std::vector<std::string>& mechanisms, exec
     std::string authMechanismToUse;
     std::string serviceName;
     std::string serviceHost;
-    for (size_t i = 0; i < m_pUserProperties->size(); i++) {
-        const std::string key = m_pUserProperties->keyAt(i);
-        const std::string value = m_pUserProperties->valueAt(i);
-
+    for (std::map<std::string, std::string>::const_iterator it=m_pUserProperties->begin(); 
+            it!=m_pUserProperties->end(); 
+            ++it){
+        const std::string key = it->first;
+        const std::string value = it->second;
         if (USERPROP_SERVICE_HOST == key) {
             serviceHost = value;
         } else if (USERPROP_SERVICE_NAME == key) {
@@ -136,13 +138,18 @@ int SaslAuthenticatorImpl::init(const std::vector<std::string>& mechanisms, exec
             m_ppwdSecret = (sasl_secret_t *) malloc(sizeof(sasl_secret_t) + length);
             std::memcpy(m_ppwdSecret->data, value.c_str(), length);
             m_ppwdSecret->len = length;
-            authMechanismToUse = PLAIN_NAME;
+            authMechanismToUse = SaslAuthenticatorImpl::PLAIN_NAME;
         } else if (USERPROP_USERNAME == key) {
             m_username = value;
         } else if (USERPROP_AUTH_MECHANISM == key) {
             authMechanismToUse = value;
         }
     }
+    // clientNeedsAuthentication() cannot be false if the code above picks an authMechanism other than PLAIN
+    assert (authMechanismToUse.empty() || authMechanismToUse == SaslAuthenticatorImpl::PLAIN_NAME ||
+            DrillClientImpl::clientNeedsAuthentication(m_pUserProperties));
+
+    m_authMechanismName = authMechanismToUse;
     if (authMechanismToUse.empty()) return SASL_NOMECH;
 
     // check if requested mechanism is supported by server
@@ -314,5 +321,17 @@ int SaslAuthenticatorImpl::unwrap(const char* dataToUnWrap, const int& dataToUnW
     return sasl_decode(m_pConnection, dataToUnWrap, dataToUnWrapLen, output, &unWrappedLen);
 }
 
+const char* SaslAuthenticatorImpl::getErrorMessage(int errorCode) {
+    switch (errorCode) {
+        case SASL_NOMECH:
+            return "No mechanism found that meets requested properties ";
+        default:
+            return sasl_errdetail(m_pConnection);
+    }
+}
+
+    const std::string &SaslAuthenticatorImpl::getAuthMechanismName() const {
+        return m_authMechanismName;
+    }
 
 } /* namespace Drill */

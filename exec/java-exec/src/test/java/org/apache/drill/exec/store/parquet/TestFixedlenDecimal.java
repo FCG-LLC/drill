@@ -17,12 +17,14 @@
  */
 package org.apache.drill.exec.store.parquet;
 
-import org.apache.drill.BaseTestQuery;
+import org.apache.drill.categories.UnlikelyTest;
+import org.apache.drill.test.BaseTestQuery;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
-import org.apache.drill.exec.proto.UserBitShared;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
+@Category({UnlikelyTest.class})
 public class TestFixedlenDecimal extends BaseTestQuery {
   // enable decimal data type
   @BeforeClass
@@ -34,9 +36,8 @@ public class TestFixedlenDecimal extends BaseTestQuery {
 
   @Test
   public void testNullCount() throws Exception {
-    String query = String.format("select count(*) as c from %s where department_id is null", DATAFILE);
     testBuilder()
-        .sqlQuery(query)
+        .sqlQuery("select count(*) as c from %s where department_id is null", DATAFILE)
         .unOrdered()
         .baselineColumns("c")
         .baselineValues(1L)
@@ -46,9 +47,8 @@ public class TestFixedlenDecimal extends BaseTestQuery {
 
   @Test
   public void testNotNullCount() throws Exception {
-    String query = String.format("select count(*) as c from %s where department_id is not null", DATAFILE);
     testBuilder()
-        .sqlQuery(query)
+        .sqlQuery("select count(*) as c from %s where department_id is not null", DATAFILE)
         .unOrdered()
         .baselineColumns("c")
         .baselineValues(106L)
@@ -58,9 +58,8 @@ public class TestFixedlenDecimal extends BaseTestQuery {
 
   @Test
   public void testSimpleQueryWithCast() throws Exception {
-    String query = String.format("select cast(department_id as bigint) as c from %s where cast(employee_id as decimal) = 170", DATAFILE);
     testBuilder()
-        .sqlQuery(query)
+        .sqlQuery("select cast(department_id as bigint) as c from %s where cast(employee_id as decimal) = 170", DATAFILE)
         .unOrdered()
         .baselineColumns("c")
         .baselineValues(80L)
@@ -70,9 +69,8 @@ public class TestFixedlenDecimal extends BaseTestQuery {
 
   @Test
   public void testSimpleQueryDrill4704Fix() throws Exception {
-    String query = String.format("select cast(department_id as bigint) as c from %s where employee_id = 170", DATAFILE);
     testBuilder()
-        .sqlQuery(query)
+        .sqlQuery("select cast(department_id as bigint) as c from %s where employee_id = 170", DATAFILE)
         .unOrdered()
         .baselineColumns("c")
         .baselineValues(80L)

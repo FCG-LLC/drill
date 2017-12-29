@@ -21,10 +21,11 @@ package org.apache.drill.exec.fn.impl;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import org.apache.drill.categories.OperatorTest;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.expression.ExpressionPosition;
 import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.common.util.FileUtils;
+import org.apache.drill.common.util.DrillFileUtils;
 import org.apache.drill.exec.ExecTest;
 import org.apache.drill.exec.expr.fn.FunctionImplementationRegistry;
 import org.apache.drill.exec.ops.FragmentContext;
@@ -45,8 +46,9 @@ import com.google.common.base.Charsets;
 import com.google.common.io.Files;
 
 import mockit.Injectable;
+import org.junit.experimental.categories.Category;
 
-
+@Category(OperatorTest.class)
 public class TestMathFunctions extends ExecTest {
   //private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestMathFunctions.class);
   private final DrillConfig c = DrillConfig.create();
@@ -57,7 +59,7 @@ public class TestMathFunctions extends ExecTest {
     mockDrillbitContext(bitContext);
 
     final PhysicalPlanReader reader = PhysicalPlanReaderTestFactory.defaultPhysicalPlanReader(c);
-    final PhysicalPlan plan = reader.readPhysicalPlan(Files.toString(FileUtils.getResourceAsFile("/functions/simple_math_functions.json"), Charsets.UTF_8));
+    final PhysicalPlan plan = reader.readPhysicalPlan(Files.toString(DrillFileUtils.getResourceAsFile("/functions/simple_math_functions.json"), Charsets.UTF_8));
     final FunctionImplementationRegistry registry = new FunctionImplementationRegistry(c);
     final FragmentContext context = new FragmentContext(bitContext, BitControl.PlanFragment.getDefaultInstance(), connection, registry);
     final SimpleRootExec exec = new SimpleRootExec(ImplCreator.getExec(context, (FragmentRoot) plan.getSortedOperators(false).iterator().next()));

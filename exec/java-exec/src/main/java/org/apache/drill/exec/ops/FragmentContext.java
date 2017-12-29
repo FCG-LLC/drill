@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,10 +17,6 @@
  */
 package org.apache.drill.exec.ops;
 
-import com.google.common.base.Function;
-import io.netty.buffer.DrillBuf;
-
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -31,10 +27,8 @@ import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.types.TypeProtos.MinorType;
 import org.apache.drill.exec.ExecConstants;
-import org.apache.drill.exec.exception.ClassTransformationException;
+import org.apache.drill.exec.compile.CodeCompiler;
 import org.apache.drill.exec.exception.OutOfMemoryException;
-import org.apache.drill.exec.expr.ClassGenerator;
-import org.apache.drill.exec.expr.CodeGenerator;
 import org.apache.drill.exec.expr.fn.FunctionImplementationRegistry;
 import org.apache.drill.exec.expr.holders.ValueHolder;
 import org.apache.drill.exec.memory.BufferAllocator;
@@ -47,8 +41,9 @@ import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.helper.QueryIdHelper;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
-import org.apache.drill.exec.rpc.control.ControlTunnel;
 import org.apache.drill.exec.rpc.UserClientConnection;
+import org.apache.drill.exec.rpc.control.ControlTunnel;
+import org.apache.drill.exec.rpc.control.WorkEventBus;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.server.options.FragmentOptionManager;
 import org.apache.drill.exec.server.options.OptionList;
@@ -61,14 +56,20 @@ import org.apache.drill.exec.util.ImpersonationUtil;
 import org.apache.drill.exec.work.batch.IncomingBuffers;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
+import io.netty.buffer.DrillBuf;
+
 /**
  * Contextual objects required for execution of a particular fragment.
+ * This is the implementation; use <tt>FragmentContextInterface</tt>
+ * in code to allow tests to use test-time implementations.
  */
-public class FragmentContext implements AutoCloseable, UdfUtilities, FragmentExecContext {
+
+public class FragmentContext extends BaseFragmentContext implements AutoCloseable, UdfUtilities, FragmentContextInterface {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(FragmentContext.class);
 
   private final Map<DrillbitEndpoint, AccountingDataTunnel> tunnels = Maps.newHashMap();
@@ -78,7 +79,6 @@ public class FragmentContext implements AutoCloseable, UdfUtilities, FragmentExe
   private final UserClientConnection connection; // is null if this context is for non-root fragment
   private final QueryContext queryContext; // is null if this context is for non-root fragment
   private final FragmentStats stats;
-  private final FunctionImplementationRegistry funcRegistry;
   private final BufferAllocator allocator;
   private final PlanFragment fragment;
   private final ContextInformation contextInformation;
@@ -87,7 +87,6 @@ public class FragmentContext implements AutoCloseable, UdfUtilities, FragmentExe
   private final BufferManager bufferManager;
   private ExecutorState executorState;
   private final ExecutionControls executionControls;
-
 
   private final SendingAccountor sendingAccountor = new SendingAccountor();
   private final Consumer<RpcException> exceptionConsumer = new Consumer<RpcException>() {
@@ -136,12 +135,12 @@ public class FragmentContext implements AutoCloseable, UdfUtilities, FragmentExe
   public FragmentContext(final DrillbitContext dbContext, final PlanFragment fragment, final QueryContext queryContext,
       final UserClientConnection connection, final FunctionImplementationRegistry funcRegistry)
     throws ExecutionSetupException {
+    super(funcRegistry);
     this.context = dbContext;
     this.queryContext = queryContext;
     this.connection = connection;
     this.accountingUserConnection = new AccountingUserConnection(connection, sendingAccountor, statusHandler);
     this.fragment = fragment;
-    this.funcRegistry = funcRegistry;
     contextInformation = new ContextInformation(fragment.getCredentials(), fragment.getContext());
 
     logger.debug("Getting initial memory allocation of {}", fragment.getMemInitial());
@@ -226,11 +225,17 @@ public class FragmentContext implements AutoCloseable, UdfUtilities, FragmentExe
     return executorState.shouldContinue();
   }
 
+  @Override
   public DrillbitContext getDrillbitContext() {
     return context;
   }
 
-  public SchemaPlus getRootSchema() {
+  /**
+   * This method is only used to construt InfoSchemaReader, it is for the reader to get full schema, so here we
+   * are going to return a fully initialized schema tree.
+   * @return root schema's plus
+   */
+  public SchemaPlus getFullRootSchema() {
     if (queryContext == null) {
       fail(new UnsupportedOperationException("Schema tree can only be created in root fragment. " +
           "This is a non-root fragment."));
@@ -248,7 +253,7 @@ public class FragmentContext implements AutoCloseable, UdfUtilities, FragmentExe
         .setIgnoreAuthErrors(isImpersonationEnabled)
         .build();
 
-    return queryContext.getRootSchema(schemaConfig);
+    return queryContext.getFullRootSchema(schemaConfig);
   }
 
   /**
@@ -314,25 +319,8 @@ public class FragmentContext implements AutoCloseable, UdfUtilities, FragmentExe
   }
 
   @Override
-  public <T> T getImplementationClass(final ClassGenerator<T> cg)
-      throws ClassTransformationException, IOException {
-    return getImplementationClass(cg.getCodeGenerator());
-  }
-
-  @Override
-  public <T> T getImplementationClass(final CodeGenerator<T> cg)
-      throws ClassTransformationException, IOException {
-    return context.getCompiler().createInstance(cg);
-  }
-
-  @Override
-  public <T> List<T> getImplementationClass(final ClassGenerator<T> cg, final int instanceCount) throws ClassTransformationException, IOException {
-    return getImplementationClass(cg.getCodeGenerator(), instanceCount);
-  }
-
-  @Override
-  public <T> List<T> getImplementationClass(final CodeGenerator<T> cg, final int instanceCount) throws ClassTransformationException, IOException {
-    return context.getCompiler().createInstances(cg, instanceCount);
+  protected CodeCompiler getCompiler() {
+    return context.getCompiler();
   }
 
   public AccountingUserConnection getUserDataTunnel() {
@@ -381,11 +369,6 @@ public class FragmentContext implements AutoCloseable, UdfUtilities, FragmentExe
   @Deprecated
   public boolean isFailed() {
     return executorState.isFailed();
-  }
-
-  @Override
-  public FunctionImplementationRegistry getFunctionRegistry() {
-    return funcRegistry;
   }
 
   @Override
@@ -440,19 +423,6 @@ public class FragmentContext implements AutoCloseable, UdfUtilities, FragmentExe
     }
   }
 
-  public DrillBuf replace(final DrillBuf old, final int newSize) {
-    return bufferManager.replace(old, newSize);
-  }
-
-  @Override
-  public DrillBuf getManagedBuffer() {
-    return bufferManager.getManagedBuffer();
-  }
-
-  public DrillBuf getManagedBuffer(final int size) {
-    return bufferManager.getManagedBuffer(size);
-  }
-
   @Override
   public PartitionExplorer getPartitionExplorer() {
     throw new UnsupportedOperationException(String.format("The partition explorer interface can only be used " +
@@ -484,6 +454,20 @@ public class FragmentContext implements AutoCloseable, UdfUtilities, FragmentExe
    */
   public void waitForSendComplete() {
     sendingAccountor.waitForSendComplete();
+  }
+
+  public WorkEventBus getWorkEventbus() {
+    return context.getWorkBus();
+  }
+
+  public boolean isBuffersDone() {
+    Preconditions.checkState(this.buffers != null, "Incoming Buffers is not set in this fragment context");
+    return buffers.isDone();
+  }
+
+  @Override
+  protected BufferManager getBufferManager() {
+    return bufferManager;
   }
 
   public interface ExecutorState {

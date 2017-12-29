@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -47,7 +47,7 @@ import com.google.common.collect.Iterators;
 public class ParquetRowGroupScan extends AbstractBase implements SubScan {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ParquetRowGroupScan.class);
 
-  public final ParquetFormatConfig formatConfig;
+  private final ParquetFormatConfig formatConfig;
   private final ParquetFormatPlugin formatPlugin;
   private final List<RowGroupReadEntry> rowGroupReadEntries;
   private final List<SchemaPath> columns;
@@ -65,9 +65,12 @@ public class ParquetRowGroupScan extends AbstractBase implements SubScan {
       @JsonProperty("selectionRoot") String selectionRoot, //
       @JsonProperty("filter") LogicalExpression filter
   ) throws ExecutionSetupException {
-    this(userName, (ParquetFormatPlugin) registry.getFormatPlugin(Preconditions.checkNotNull(storageConfig),
-            formatConfig == null ? new ParquetFormatConfig() : formatConfig),
-        rowGroupReadEntries, columns, selectionRoot, filter);
+    this(userName,
+        (ParquetFormatPlugin) registry.getFormatPlugin(Preconditions.checkNotNull(storageConfig), Preconditions.checkNotNull(formatConfig)),
+        rowGroupReadEntries,
+        columns,
+        selectionRoot,
+        filter);
   }
 
   public ParquetRowGroupScan( //
@@ -79,7 +82,7 @@ public class ParquetRowGroupScan extends AbstractBase implements SubScan {
       LogicalExpression filter
   ) {
     super(userName);
-    this.formatPlugin = Preconditions.checkNotNull(formatPlugin);
+    this.formatPlugin = Preconditions.checkNotNull(formatPlugin, "Could not find format config for the given configuration");
     this.formatConfig = formatPlugin.getConfig();
     this.rowGroupReadEntries = rowGroupReadEntries;
     this.columns = columns == null ? GroupScan.ALL_COLUMNS : columns;
@@ -95,6 +98,14 @@ public class ParquetRowGroupScan extends AbstractBase implements SubScan {
   @JsonProperty("storage")
   public StoragePluginConfig getEngineConfig() {
     return formatPlugin.getStorageConfig();
+  }
+
+  /**
+   * @return Parquet plugin format config
+   */
+  @JsonProperty("format")
+  public ParquetFormatConfig getFormatConfig() {
+    return formatConfig;
   }
 
   public String getSelectionRoot() {

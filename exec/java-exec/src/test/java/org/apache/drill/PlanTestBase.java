@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -36,6 +36,8 @@ import org.apache.calcite.sql.SqlExplain.Depth;
 import org.apache.calcite.sql.SqlExplainLevel;
 
 import com.google.common.base.Strings;
+import org.apache.drill.test.BaseTestQuery;
+import org.apache.drill.test.QueryTestUtil;
 
 public class PlanTestBase extends BaseTestQuery {
 
@@ -279,6 +281,19 @@ public class PlanTestBase extends BaseTestQuery {
     }
   }
 
+
+  /**
+   * Creates physical plan for the given query and then executes this plan.
+   * This method is useful for testing serialization / deserialization issues.
+   *
+   * @param query query string
+   */
+  public static void testPhysicalPlanExecutionBasedOnQuery(String query) throws Exception {
+    query = "EXPLAIN PLAN for " + QueryTestUtil.normalizeQuery(query);
+    String plan = getPlanInString(query, JSON_FORMAT);
+    testPhysical(plan);
+  }
+
   /*
    * This will get the plan (either logical or physical) in Optiq RelNode
    * format, based on SqlExplainLevel and Depth.
@@ -349,7 +364,7 @@ public class PlanTestBase extends BaseTestQuery {
       }
 
       if (!silent) {
-        System.out.println(vw.getValueVector().getField().getPath());
+        System.out.println(vw.getValueVector().getField().getName());
       }
       final ValueVector vv = vw.getValueVector();
       for (int i = 0; i < vv.getAccessor().getValueCount(); i++) {

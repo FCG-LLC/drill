@@ -23,9 +23,11 @@ import static org.junit.Assert.assertTrue;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.drill.categories.OperatorTest;
+import org.apache.drill.categories.SlowTest;
 import org.apache.drill.common.config.DrillConfig;
-import org.apache.drill.common.util.FileUtils;
-import org.apache.drill.common.util.TestTools;
+import org.apache.drill.common.util.DrillFileUtils;
+import org.apache.drill.test.TestTools;
 import org.apache.drill.exec.client.DrillClient;
 import org.apache.drill.exec.expr.fn.FunctionImplementationRegistry;
 import org.apache.drill.exec.ops.FragmentContext;
@@ -47,6 +49,7 @@ import org.apache.drill.exec.server.RemoteServiceSet;
 import org.apache.drill.exec.vector.ValueVector;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.rules.TestRule;
 
 import com.google.common.base.Charsets;
@@ -54,7 +57,7 @@ import com.google.common.io.Files;
 
 import mockit.Injectable;
 
-
+@Category({SlowTest.class, OperatorTest.class})
 public class TestHashJoin extends PopUnitTestBase {
   //private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestMergeJoin.class);
 
@@ -67,7 +70,7 @@ public class TestHashJoin extends PopUnitTestBase {
     mockDrillbitContext(bitContext);
 
     final PhysicalPlanReader reader = PhysicalPlanReaderTestFactory.defaultPhysicalPlanReader(c);
-    final PhysicalPlan plan = reader.readPhysicalPlan(Files.toString(FileUtils.getResourceAsFile(physicalPlan), Charsets.UTF_8));
+    final PhysicalPlan plan = reader.readPhysicalPlan(Files.toString(DrillFileUtils.getResourceAsFile(physicalPlan), Charsets.UTF_8));
     final FunctionImplementationRegistry registry = new FunctionImplementationRegistry(c);
     final FragmentContext context = new FragmentContext(bitContext, PlanFragment.getDefaultInstance(), connection, registry);
     final SimpleRootExec exec = new SimpleRootExec(ImplCreator.getExec(context, (FragmentRoot) plan.getSortedOperators(false).iterator().next()));
@@ -117,9 +120,9 @@ public class TestHashJoin extends PopUnitTestBase {
       bit.run();
       client.connect();
       List<QueryDataBatch> results = client.runQuery(org.apache.drill.exec.proto.UserBitShared.QueryType.PHYSICAL,
-              Files.toString(FileUtils.getResourceAsFile("/join/hash_join.json"), Charsets.UTF_8)
-                      .replace("#{TEST_FILE_1}", FileUtils.getResourceAsFile("/build_side_input.json").toURI().toString())
-                      .replace("#{TEST_FILE_2}", FileUtils.getResourceAsFile("/probe_side_input.json").toURI().toString()));
+              Files.toString(DrillFileUtils.getResourceAsFile("/join/hash_join.json"), Charsets.UTF_8)
+                      .replace("#{TEST_FILE_1}", DrillFileUtils.getResourceAsFile("/build_side_input.json").toURI().toString())
+                      .replace("#{TEST_FILE_2}", DrillFileUtils.getResourceAsFile("/probe_side_input.json").toURI().toString()));
 
       RecordBatchLoader batchLoader = new RecordBatchLoader(bit.getContext().getAllocator());
 
@@ -160,7 +163,7 @@ public class TestHashJoin extends PopUnitTestBase {
       bit.run();
       client.connect();
       final List<QueryDataBatch> results = client.runQuery(org.apache.drill.exec.proto.UserBitShared.QueryType.PHYSICAL,
-              Files.toString(FileUtils.getResourceAsFile("/join/hj_exchanges.json"), Charsets.UTF_8));
+              Files.toString(DrillFileUtils.getResourceAsFile("/join/hj_exchanges.json"), Charsets.UTF_8));
 
       int count = 0;
       for (final QueryDataBatch b : results) {
@@ -188,9 +191,9 @@ public class TestHashJoin extends PopUnitTestBase {
       bit.run();
       client.connect();
       final List<QueryDataBatch> results = client.runQuery(org.apache.drill.exec.proto.UserBitShared.QueryType.PHYSICAL,
-              Files.toString(FileUtils.getResourceAsFile("/join/hj_multi_condition_join.json"), Charsets.UTF_8)
-                      .replace("#{TEST_FILE_1}", FileUtils.getResourceAsFile("/build_side_input.json").toURI().toString())
-                      .replace("#{TEST_FILE_2}", FileUtils.getResourceAsFile("/probe_side_input.json").toURI().toString()));
+              Files.toString(DrillFileUtils.getResourceAsFile("/join/hj_multi_condition_join.json"), Charsets.UTF_8)
+                      .replace("#{TEST_FILE_1}", DrillFileUtils.getResourceAsFile("/build_side_input.json").toURI().toString())
+                      .replace("#{TEST_FILE_2}", DrillFileUtils.getResourceAsFile("/probe_side_input.json").toURI().toString()));
 
       final RecordBatchLoader batchLoader = new RecordBatchLoader(bit.getContext().getAllocator());
 
@@ -234,7 +237,7 @@ public class TestHashJoin extends PopUnitTestBase {
       bit.run();
       client.connect();
       final List<QueryDataBatch> results = client.runQuery(org.apache.drill.exec.proto.UserBitShared.QueryType.PHYSICAL,
-          Files.toString(FileUtils.getResourceAsFile("/join/hj_exchanges1.json"), Charsets.UTF_8));
+          Files.toString(DrillFileUtils.getResourceAsFile("/join/hj_exchanges1.json"), Charsets.UTF_8));
 
       int count = 0;
       for (final QueryDataBatch b : results) {
@@ -259,7 +262,7 @@ public class TestHashJoin extends PopUnitTestBase {
       bit1.run();
       client.connect();
       final List<QueryDataBatch> results = client.runQuery(org.apache.drill.exec.proto.UserBitShared.QueryType.PHYSICAL,
-              Files.toString(FileUtils.getResourceAsFile("/join/hashJoinExpr.json"), Charsets.UTF_8));
+              Files.toString(DrillFileUtils.getResourceAsFile("/join/hashJoinExpr.json"), Charsets.UTF_8));
       int count = 0;
       for (final QueryDataBatch b : results) {
         if (b.getHeader().getRowCount() != 0) {

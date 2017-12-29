@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.memory.AllocationReservation;
+import org.apache.drill.exec.memory.BaseAllocator;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.record.BatchSchema;
@@ -129,12 +130,6 @@ public class SortRecordBatchBuilder implements AutoCloseable {
     runningBatches++;
     batches.put(rbd.getContainer().getSchema(), rbd);
     recordCount += rbd.getRecordCount();
-  }
-
-  public void canonicalize() {
-    for (RecordBatchData batch : batches.values()) {
-      batch.canonicalize();
-    }
   }
 
   public boolean isEmpty() {
@@ -244,15 +239,17 @@ public class SortRecordBatchBuilder implements AutoCloseable {
   }
 
   /**
-   * For given record count how much memory does SortRecordBatchBuilder needs for its own purpose. This is used in
-   * ExternalSortBatch to make decisions about whether to spill or not.
+   * For given record count, return the memory that SortRecordBatchBuilder needs
+   * for its own purpose. This is used in ExternalSortBatch to make decisions
+   * about whether to spill or not.
    *
-   * @param recordCount
-   * @return
+   * @param recordCount expected output record count
+   * @return number of bytes needed for an SV4, power-of-two rounded
    */
+
   public static long memoryNeeded(int recordCount) {
     // We need 4 bytes (SV4) for each record. Due to power-of-two allocations, the
     // backing buffer might be twice this size.
-    return recordCount * 2 * 4;
+    return BaseAllocator.nextPowerOfTwo(recordCount * 4);
   }
 }

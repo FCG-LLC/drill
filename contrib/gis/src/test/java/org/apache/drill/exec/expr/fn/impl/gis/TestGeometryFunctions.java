@@ -17,19 +17,22 @@
  */
 package org.apache.drill.exec.expr.fn.impl.gis;
 
-import org.apache.drill.BaseTestQuery;
+import org.apache.drill.test.BaseTestQuery;
 import org.junit.Test;
 
 public class TestGeometryFunctions extends BaseTestQuery {
 
   String wktPoint = "POINT (-121.895 37.339)";
+  String json = "{\"x\":-121.895,\"y\":37.339,\"spatialReference\":{\"wkid\":4326}}";
+  String geoJson = "{\"type\":\"Point\",\"coordinates\":[-121.895,37.339],"
+    + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:4326\"}}}";
 
   @Test
   public void testGeometryFromTextCreation() throws Exception {
 
     testBuilder()
     .sqlQuery("select ST_AsText(ST_GeomFromText('" + wktPoint + "')) "
-        + "from cp.`/sample-data/CA-cities.csv` limit 1")
+        + "from cp.`sample-data/CA-cities.csv` limit 1")
     .ordered().baselineColumns("EXPR$0")
     .baselineValues(wktPoint)
     .build()
@@ -41,9 +44,57 @@ public class TestGeometryFunctions extends BaseTestQuery {
 
     testBuilder()
       .sqlQuery("select ST_AsText(ST_Point(-121.895, 37.339)) "
-          + "from cp.`/sample-data/CA-cities.csv` limit 1")
+          + "from cp.`sample-data/CA-cities.csv` limit 1")
       .ordered().baselineColumns("EXPR$0")
       .baselineValues(wktPoint)
+      .build()
+      .run();
+  }
+
+  @Test
+  public void testJSONFromPointCreation() throws Exception {
+    testBuilder()
+      .sqlQuery("select ST_AsJson(ST_Point(-121.895, 37.339)) "
+        + "from cp.`/sample-data/CA-cities.csv` limit 1")
+      .ordered()
+      .baselineColumns("EXPR$0")
+      .baselineValues(json)
+      .build()
+      .run();
+  }
+
+  @Test
+  public void testJSONFromTextCreation() throws Exception {
+    testBuilder()
+      .sqlQuery("select ST_AsJson(ST_GeomFromText('" + wktPoint + "')) "
+        + "from cp.`/sample-data/CA-cities.csv` limit 1")
+      .ordered()
+      .baselineColumns("EXPR$0")
+      .baselineValues(json)
+      .build()
+      .run();
+  }
+
+  @Test
+  public void testGeoJSONCreationFromPoint() throws Exception {
+    testBuilder()
+      .sqlQuery("select ST_AsGeoJSON(ST_Point(-121.895, 37.339)) "
+        + "from cp.`/sample-data/CA-cities.csv` limit 1")
+      .ordered()
+      .baselineColumns("EXPR$0")
+      .baselineValues(geoJson)
+      .build()
+      .run();
+  }
+
+  @Test
+  public void testGeoJSONCreationFromGeom() throws Exception {
+    testBuilder()
+      .sqlQuery("select ST_AsGeoJSON(ST_GeomFromText('" + wktPoint + "')) "
+        + "from cp.`/sample-data/CA-cities.csv` limit 1")
+      .ordered()
+      .baselineColumns("EXPR$0")
+      .baselineValues(geoJson)
       .build()
       .run();
   }
@@ -55,7 +106,7 @@ public class TestGeometryFunctions extends BaseTestQuery {
       .sqlQuery("select ST_Within(ST_Point(columns[4], columns[3]),"
           + "ST_GeomFromText('POLYGON((-121.95 37.28, -121.94 37.35, -121.84 37.35, -121.84 37.28, -121.95 37.28))')"
           + ") "
-          + "from cp.`/sample-data/CA-cities.csv` where columns[2] = 'San Jose'")
+          + "from cp.`sample-data/CA-cities.csv` where columns[2] = 'San Jose'")
       .ordered().baselineColumns("EXPR$0")
       .baselineValues(true)
       .build()
@@ -66,7 +117,7 @@ public class TestGeometryFunctions extends BaseTestQuery {
     .sqlQuery("select ST_Within(" + "ST_Point(columns[4], columns[3]),"
         + "ST_GeomFromText('POLYGON((-121.95 37.28, -121.94 37.35, -121.84 37.35, -121.84 37.28, -121.95 37.28))')"
         + ") "
-        + "from cp.`/sample-data/CA-cities.csv` where columns[2] = 'San Francisco'")
+        + "from cp.`sample-data/CA-cities.csv` where columns[2] = 'San Francisco'")
     .ordered().baselineColumns("EXPR$0")
     .baselineValues(false)
     .build()

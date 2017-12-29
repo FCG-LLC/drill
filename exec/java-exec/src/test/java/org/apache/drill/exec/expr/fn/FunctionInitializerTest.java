@@ -21,16 +21,18 @@ import mockit.Invocation;
 import mockit.Mock;
 import mockit.MockUp;
 import mockit.integration.junit4.JMockit;
-import org.apache.drill.common.util.TestTools;
+import org.apache.drill.categories.SqlFunctionTest;
+import org.apache.drill.test.TestTools;
 import org.apache.drill.exec.util.JarUtil;
 import org.codehaus.janino.Java;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 
-import java.io.File;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -46,6 +48,7 @@ import static org.junit.Assert.assertTrue;
 
 
 @RunWith(JMockit.class)
+@Category(SqlFunctionTest.class)
 public class FunctionInitializerTest {
 
   private static final String CLASS_NAME = "com.drill.udf.CustomLowerFunction";
@@ -53,10 +56,12 @@ public class FunctionInitializerTest {
 
   @BeforeClass
   public static void init() throws Exception {
-    File jars = new File(TestTools.getWorkingPath(), "/src/test/resources/jars");
+    Path jars = TestTools.WORKING_PATH
+      .resolve(TestTools.TEST_RESOURCES)
+      .resolve("jars");
     String binaryName = "DrillUDF-1.0.jar";
     String sourceName = JarUtil.getSourceName(binaryName);
-    URL[] urls = {new File(jars, binaryName).toURI().toURL(), new File(jars, sourceName).toURI().toURL()};
+    URL[] urls = {jars.resolve(binaryName).toUri().toURL(), jars.resolve(sourceName).toUri().toURL()};
     classLoader = new URLClassLoader(urls);
   }
 

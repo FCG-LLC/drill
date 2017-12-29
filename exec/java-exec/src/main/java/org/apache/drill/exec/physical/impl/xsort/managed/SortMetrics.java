@@ -44,10 +44,11 @@ public class SortMetrics {
   private long writeBytes;
 
   public SortMetrics(OperatorStatReceiver stats) {
+    assert stats != null;
     this.stats = stats;
   }
 
-  public void updateInputMetrics(int rowCount, int batchSize) {
+  public void updateInputMetrics(int rowCount, long batchSize) {
     inputRecordCount += rowCount;
     inputBatchCount++;
     totalInputBytes += batchSize;

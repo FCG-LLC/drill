@@ -17,10 +17,14 @@
  */
 package org.apache.drill;
 
+import org.apache.drill.categories.SlowTest;
+import org.apache.drill.test.BaseTestQuery;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
-public class TestTpchDistributedStreaming extends BaseTestQuery{
+@Category({SlowTest.class})
+public class TestTpchDistributedStreaming extends BaseTestQuery {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestTpchDistributedStreaming.class);
 
   private void testDistributed(String fileName) throws Exception{

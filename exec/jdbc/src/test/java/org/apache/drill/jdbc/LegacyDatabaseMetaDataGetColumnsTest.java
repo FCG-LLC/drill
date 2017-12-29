@@ -24,13 +24,15 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Properties;
 
-import org.apache.drill.jdbc.test.JdbcAssert;
+import org.apache.drill.categories.JdbcTest;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
 /**
  * Test compatibility with older versions of the server
  */
+@Category(JdbcTest.class)
 public class LegacyDatabaseMetaDataGetColumnsTest extends DatabaseMetaDataGetColumnsTest {
 
   @BeforeClass
@@ -39,11 +41,10 @@ public class LegacyDatabaseMetaDataGetColumnsTest extends DatabaseMetaDataGetCol
     // (Note: Can't use JdbcTest's connect(...) because JdbcTest closes
     // Connection--and other JDBC objects--on test method failure, but this test
     // class uses some objects across methods.)
-    Properties defaultProperties = JdbcAssert.getDefaultProperties();
+    Properties defaultProperties = getDefaultProperties();
     defaultProperties.setProperty("server.metadata.disabled", "true");
 
-    connection = new Driver().connect( "jdbc:drill:zk=local",
-                                       defaultProperties );
+    connection = connect("jdbc:drill:zk=local", defaultProperties);
     dbMetadata = connection.getMetaData();
 
     DatabaseMetaDataGetColumnsTest.setUpMetadataToCheck();

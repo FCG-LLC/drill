@@ -1,4 +1,4 @@
-FROM ubuntu:14.04
+FROM portus.cs.int:5000/prod/cs-base-java
 ARG destEnv
 MAINTAINER team@cs.com
 
@@ -9,19 +9,13 @@ ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en  
 ENV LC_ALL en_US.UTF-8 
 
-RUN apt-get update -y
-RUN apt-get upgrade -y
-RUN apt-get install wget -y
-RUN echo "deb http://aptly.cs.int/public trusty main" >> /etc/apt/sources.list
-RUN wget http://aptly.cs.int/public/cs-repo.key -O /tmp/cs-repo.key && apt-key add /tmp/cs-repo.key && rm -f /tmp/cs-repo.key
 RUN echo "deb http://aptly.cs.int/public xenial $destEnv" >> /etc/apt/sources.list
 RUN printf "Package: * \nPin: release a=xenial, o=aptly.cs.int \nPin-Priority: 1600 \n" > /etc/apt/preferences
 
-RUN apt-get install curl software-properties-common paxctl pax-utils -y
-RUN add-apt-repository ppa:webupd8team/java -y
 RUN apt-get update -y
-RUN echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | /usr/bin/debconf-set-selections
-RUN apt-get install -y oracle-java8-installer vim -y
+RUN apt-get upgrade -y
+
+RUN apt-get install curl paxctl pax-utils -y
 
 RUN groupadd -g 10007 drill
 RUN adduser --system --shell /bin/false --gecos 'drill dedicated user' --uid 10007 --gid 10007 --disabled-password drill

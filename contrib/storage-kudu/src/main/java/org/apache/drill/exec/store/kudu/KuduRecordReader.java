@@ -75,6 +75,7 @@ public class KuduRecordReader extends AbstractRecordReader {
 
   private final boolean allUnsignedINT8;
   private final boolean allUnsignedINT16;
+  private final boolean allUnsignedINT32;
 
   private String tableName;
 
@@ -103,9 +104,11 @@ public class KuduRecordReader extends AbstractRecordReader {
     if (this.pluginConfig != null) {
       this.allUnsignedINT8 = this.pluginConfig.isAllUnsignedINT8();
       this.allUnsignedINT16 = this.pluginConfig.isAllUnsignedINT16();
+      this.allUnsignedINT32 = this.pluginConfig.isAllUnsignedINT32();
     } else {
       this.allUnsignedINT8 = false;
       this.allUnsignedINT16 = false;
+      this.allUnsignedINT32 = false;
     }
 
     setColumns(projectedColumns);
@@ -159,7 +162,7 @@ public class KuduRecordReader extends AbstractRecordReader {
         .put(Type.FLOAT, MinorType.FLOAT4)
         .put(Type.INT8, MinorType.INT)
         .put(Type.INT16, MinorType.INT)
-        .put(Type.INT32, MinorType.INT)
+        .put(Type.INT32, MinorType.BIGINT)
         .put(Type.INT64, MinorType.BIGINT)
         .put(Type.STRING, MinorType.VARCHAR)
         .put(Type.UNIXTIME_MICROS, MinorType.TIMESTAMP)
@@ -269,6 +272,14 @@ public class KuduRecordReader extends AbstractRecordReader {
     }
 
     projectedCols = pciBuilder.build();
+  }
+
+  private long transformINT32(int in) {
+    if (allUnsignedINT32) {
+      return Integer.toUnsignedLong(in);
+    } else {
+      return in;
+    }
   }
 
   private int transformINT16(short in) {
@@ -386,12 +397,12 @@ public class KuduRecordReader extends AbstractRecordReader {
             ((NullableIntVector.Mutator) pci.vv.getMutator())
                     .setNull(rowIndex);
           } else {
-            ((NullableIntVector.Mutator) pci.vv.getMutator())
-                    .setSafe(rowIndex, result.getInt(pci.index));
+            ((NullableBigIntVector.Mutator) pci.vv.getMutator())
+                    .setSafe(rowIndex, transformINT32(result.getInt(pci.index)));
           }
         } else {
-          ((IntVector.Mutator) pci.vv.getMutator())
-              .setSafe(rowIndex, result.getInt(pci.index));
+          ((BigIntVector.Mutator) pci.vv.getMutator())
+              .setSafe(rowIndex, transformINT32(result.getInt(pci.index)));
         }
         break;
       case INT8:

@@ -44,7 +44,14 @@ public class BaseKuduTest extends BaseTestQuery {
         final StoragePluginRegistry pluginRegistry = getDrillbitContext().getStorage();
         storagePlugin = (KuduStoragePlugin) pluginRegistry.getPlugin(KUDU_STORAGE_PLUGIN_NAME);
         storagePluginConfig = storagePlugin.getConfig();
-        storagePluginConfig = new KuduStoragePluginConfig(storagePluginConfig.getMasterAddresses(), storagePluginConfig.getOperationTimeoutMs(), OPTIMIZER_MAX_NON_PRIMARY_KEY_ALTERNATIVES, true, true);
+        storagePluginConfig = new KuduStoragePluginConfig(
+                storagePluginConfig.getMasterAddresses(),
+                storagePluginConfig.getOperationTimeoutMs(),
+                OPTIMIZER_MAX_NON_PRIMARY_KEY_ALTERNATIVES,
+                true,
+                true,
+                true
+        );
         storagePluginConfig.setEnabled(true);
         pluginRegistry.createOrUpdate(KUDU_STORAGE_PLUGIN_NAME, storagePluginConfig, true);
 
@@ -60,9 +67,10 @@ public class BaseKuduTest extends BaseTestQuery {
             }
 
             List<ColumnSchema> columns = new ArrayList<>(4);
-            columns.add(new ColumnSchema.ColumnSchemaBuilder("key1", Type.INT32).key(true).build());
+            columns.add(new ColumnSchema.ColumnSchemaBuilder("key1", Type.INT64).key(true).build());
             columns.add(new ColumnSchema.ColumnSchemaBuilder("key2", Type.STRING).key(true).build());
             columns.add(new ColumnSchema.ColumnSchemaBuilder("key3", Type.INT8).key(true).build());
+            columns.add(new ColumnSchema.ColumnSchemaBuilder("key4", Type.INT32).key(true).build());
             columns.add(new ColumnSchema.ColumnSchemaBuilder("x", Type.INT16).key(false).build());
             columns.add(new ColumnSchema.ColumnSchemaBuilder("str",  Type.STRING).nullable(true).build());
 
@@ -78,20 +86,22 @@ public class BaseKuduTest extends BaseTestQuery {
             KuduSession session = client.newSession();
             session.setFlushMode(SessionConfiguration.FlushMode.AUTO_FLUSH_SYNC);
 
-            int[] key1_values =    {    1,    2,    2,    3,    4 };
+            long[] key1_values =   {    1,    2,    2,    3,    4 };
             String[] key2_values = {  "a",  "b",  "b",  "b",  "d" };
             byte[] key3_values =   {  101,  102,  103,  104,  (byte) 205 };
+            int[] key4_values =    { 1, 0, Integer.MAX_VALUE, (int) 3000000000L, (int) 4200000000L };
             short[] x_values =     {    1,    0,  Short.MAX_VALUE, (short) 40500, (short) 65535 };
             String[] str_values =  { "xx", "yy", "zz", "uu", "vv" };
 
             for (int i = 0; i < key1_values.length; i++) {
                 Insert insert = table.newInsert();
                 PartialRow row = insert.getRow();
-                row.addInt(0, key1_values[i]);
+                row.addLong(0, key1_values[i]);
                 row.addString(1, key2_values[i]);
                 row.addByte(2, key3_values[i]);
-                row.addShort( 3, x_values[i]);
-                row.addString(4, str_values[i]);
+                row.addInt(3, key4_values[i]);
+                row.addShort( 4, x_values[i]);
+                row.addString(5, str_values[i]);
                 session.apply(insert);
             }
         }

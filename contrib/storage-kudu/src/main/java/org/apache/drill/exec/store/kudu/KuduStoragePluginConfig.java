@@ -34,6 +34,7 @@ public class KuduStoragePluginConfig extends StoragePluginConfigBase {
   private final int optimizerMaxNonPrimaryKeyAlternatives;
   private final boolean allUnsignedINT8;
   private final boolean allUnsignedINT16;
+  private final boolean allUnsignedINT32;
 
   @JsonCreator
   public KuduStoragePluginConfig(
@@ -41,12 +42,14 @@ public class KuduStoragePluginConfig extends StoragePluginConfigBase {
           @JsonProperty("operationTimeoutMs") long operationTimoutMs,
           @JsonProperty("optimizerMaxNonPrimaryKeyAlternatives") int optimizerMaxNonPrimaryKeyAlternatives,
           @JsonProperty("allUnsignedINT8") boolean allUnsignedINT8,
-          @JsonProperty("allUnsignedINT16") boolean allUnsignedINT16) {
+          @JsonProperty("allUnsignedINT16") boolean allUnsignedINT16,
+          @JsonProperty("allUnsignedINT32") boolean allUnsignedINT32) {
     this.masterAddresses = masterAddresses;
     this.operationTimeoutMs = operationTimoutMs;
     this.optimizerMaxNonPrimaryKeyAlternatives = optimizerMaxNonPrimaryKeyAlternatives;
     this.allUnsignedINT8 = allUnsignedINT8;
     this.allUnsignedINT16 = allUnsignedINT16;
+    this.allUnsignedINT32 = allUnsignedINT32;
   }
 
   public String getMasterAddresses() {
@@ -61,6 +64,8 @@ public class KuduStoragePluginConfig extends StoragePluginConfigBase {
 
   public boolean isAllUnsignedINT16() { return allUnsignedINT16; }
 
+  public boolean isAllUnsignedINT32() { return allUnsignedINT32; }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) { return true; }
@@ -72,6 +77,7 @@ public class KuduStoragePluginConfig extends StoragePluginConfigBase {
     if (optimizerMaxNonPrimaryKeyAlternatives != that.optimizerMaxNonPrimaryKeyAlternatives) { return false; }
     if (allUnsignedINT8 != that.allUnsignedINT8) { return false; }
     if (allUnsignedINT16 != that.allUnsignedINT16) { return false; }
+    if (allUnsignedINT32 != that.allUnsignedINT32) { return false; }
 
     return masterAddresses != null ? masterAddresses.equals(that.masterAddresses) : that.masterAddresses == null;
   }
@@ -83,6 +89,7 @@ public class KuduStoragePluginConfig extends StoragePluginConfigBase {
     result = 31 * result + optimizerMaxNonPrimaryKeyAlternatives;
     result = 31 * result + (allUnsignedINT8 ? 1 : 0);
     result = 31 * result + (allUnsignedINT16 ? 1 : 0);
+    result = 31 * result + (allUnsignedINT32 ? 1 : 0);
     return result;
   }
 }

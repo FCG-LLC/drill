@@ -107,6 +107,11 @@
 
   <repositories>
     <repository>
+      <id>nexus01</id>
+      <name>Maven Central Proxy</name>
+      <url>http://nexus.cs.int/repository/maven-central/</url>
+    </repository>
+    <repository>
       <id>conjars</id>
       <name>Conjars</name>
       <url>http://conjars.org/repo</url>
@@ -180,6 +185,14 @@
       </snapshots>
     </repository>
   </repositories>
+
+  <pluginRepositories>
+    <pluginRepository>
+      <id>nexus01</id>
+      <name>Maven Central Proxy</name>
+      <url>http://nexus.cs.int/repository/maven-central/</url>
+    </pluginRepository>
+  </pluginRepositories>
 
   <issueManagement>
     <system>Jira</system>
@@ -2616,6 +2629,7 @@
     </profile>
   </profiles>
   <modules>
+    <module>customfuncs</module>
     <module>tools</module>
     <module>protocol</module>
     <module>common</module>

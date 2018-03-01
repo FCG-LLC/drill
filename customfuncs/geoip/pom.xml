@@ -18,6 +18,7 @@
     <lombok.version>1.16.10</lombok.version>
     <maven.build.timestamp.format>yyMMddHHmm</maven.build.timestamp.format>
     <buildTimestamp>${maven.build.timestamp}</buildTimestamp>
+    <checkstyle.skip>true</checkstyle.skip>
   </properties>
 
     <dependencies>

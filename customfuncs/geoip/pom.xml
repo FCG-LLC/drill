@@ -4,8 +4,14 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>cs</groupId>
+    <parent>
+        <artifactId>drill-customfuncs-parent</artifactId>
+        <groupId>org.apache.drill.customfuncs</groupId>
+        <version>1.12.0</version>
+    </parent>
+
     <artifactId>drill-geoip</artifactId>
+    <name>customfuncs/geoip</name>
     <version>1.1</version>
 
   <properties>
@@ -113,6 +119,15 @@
                         <descriptor>src/assembly/src.xml</descriptor>
                     </descriptors>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -121,32 +136,6 @@
                     <source>1.8</source>
                     <target>1.8</target>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.vafer</groupId>
-                <artifactId>jdeb</artifactId>
-                <version>1.5</version>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>jdeb</goal>
-                        </goals>
-                      <configuration>
-                        <deb>target/apache-drill-geoip-${project.version}-${maven.build.timestamp}.deb</deb>
-                        <dataSet>
-                          <data>
-                            <src>target/drill-geoip-${project.version}-drill.jar</src>
-                            <type>file</type>
-                            <mapper>
-                              <type>perm</type>
-                              <prefix>/opt/drill/jars/3rdparty</prefix>
-                            </mapper>
-                          </data>
-                        </dataSet>
-                      </configuration>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
 

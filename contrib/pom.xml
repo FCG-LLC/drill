@@ -32,16 +32,16 @@
   </dependencies>
 
   <modules>
-    <module>storage-hbase</module>
-    <module>format-maprdb</module>
-    <module>storage-hive</module>
-    <module>storage-mongo</module>
+    <!-- <module>storage-hbase</module> -->
+    <!-- <module>format-maprdb</module> -->
+    <!-- <module>storage-hive</module> -->
+    <!-- <module>storage-mongo</module> -->
     <module>storage-jdbc</module>
-    <module>storage-kafka</module>
+    <!-- <module>storage-kafka</module> -->
     <module>storage-kudu</module>
-    <module>storage-opentsdb</module>
-    <module>sqlline</module>
-    <module>data</module>
-    <module>gis</module>
+    <!-- <module>storage-opentsdb</module> -->
+    <!-- <module>sqlline</module> -->
+    <!-- <module>data</module> -->
+    <!-- <module>gis</module> -->
   </modules>
 </project>

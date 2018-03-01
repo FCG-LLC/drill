@@ -1,8 +1,0 @@
-Package: apache-drill-ip-enrichment
-Version: [[project.version]]-[[buildTimestamp]]
-Section: misc
-Priority: optional
-Architecture: all
-Maintainer: name <>
-Description: CS Apache Drill IP enriching functions
-Distribution: development

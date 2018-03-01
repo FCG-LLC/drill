@@ -5,7 +5,7 @@ import org.apache.drill.exec.expr.annotations.FunctionTemplate;
 import org.apache.drill.exec.expr.annotations.Output;
 import org.apache.drill.exec.expr.annotations.Param;
 import org.apache.drill.exec.expr.holders.*;
-import org.apache.drill.exec.vector.complex.writer.BaseWriter;
+import org.apache.drill.exec.vector.complex.writer.BaseWriter.ComplexWriter;
 
 public final class NumberBits {
     @FunctionTemplate(
@@ -15,17 +15,15 @@ public final class NumberBits {
     )
     public static class NumberBitsOfBigIntFunction implements DrillSimpleFunc {
         @Param BigIntHolder number;
-        @Output BaseWriter.ComplexWriter out;
+        @Output ComplexWriter out;
 
         @Override
-        public void setup() {
-            System.out.println("SETUP !!!!!!!!");
-        }
+        public void setup() {}
 
         @Override
         public void eval() {
             long input = number.value;
-            BaseWriter.ListWriter list = out.rootAsList();
+            org.apache.drill.exec.vector.complex.writer.BaseWriter.ListWriter list = out.rootAsList();
             list.startList();
             byte i = 0;
             while (input != 0 && i < 64) {
@@ -46,7 +44,7 @@ public final class NumberBits {
     )
     public static class NumberBitsOfIntFunction implements DrillSimpleFunc {
         @Param IntHolder number;
-        @Output BaseWriter.ComplexWriter out;
+        @Output ComplexWriter out;
 
         @Override
         public void setup() {}
@@ -54,7 +52,7 @@ public final class NumberBits {
         @Override
         public void eval() {
             int input = number.value;
-            BaseWriter.ListWriter list = out.rootAsList();
+            org.apache.drill.exec.vector.complex.writer.BaseWriter.ListWriter list = out.rootAsList();
             list.startList();
             byte i = 0;
             while (input != 0 && i < 32) {
@@ -75,7 +73,7 @@ public final class NumberBits {
     )
     public static class NumberBitsOfSmallIntFunction implements DrillSimpleFunc {
         @Param SmallIntHolder number;
-        @Output BaseWriter.ComplexWriter out;
+        @Output ComplexWriter out;
 
         @Override
         public void setup() {}
@@ -83,7 +81,7 @@ public final class NumberBits {
         @Override
         public void eval() {
             short input = number.value;
-            BaseWriter.ListWriter list = out.rootAsList();
+            org.apache.drill.exec.vector.complex.writer.BaseWriter.ListWriter list = out.rootAsList();
             list.startList();
             byte i = 0;
             while (input != 0 && i < 16) {
@@ -104,7 +102,7 @@ public final class NumberBits {
     )
     public static class NumberBitsOfTinyIntFunction implements DrillSimpleFunc {
         @Param TinyIntHolder number;
-        @Output BaseWriter.ComplexWriter out;
+        @Output ComplexWriter out;
 
         @Override
         public void setup() {}
@@ -112,7 +110,7 @@ public final class NumberBits {
         @Override
         public void eval() {
             byte input = number.value;
-            BaseWriter.ListWriter list = out.rootAsList();
+            org.apache.drill.exec.vector.complex.writer.BaseWriter.ListWriter list = out.rootAsList();
             list.startList();
             byte i = 0;
             while (input != 0 && i < 8) {

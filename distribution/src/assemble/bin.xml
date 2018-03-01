@@ -193,6 +193,8 @@
       <useProjectArtifact>false</useProjectArtifact>
       <includes>
         <include>com.google.protobuf:protobuf-java:jar:2.5</include>
+        <include>org.apache.drill.customfuncs:drill-ip-enrichment</include>
+        <include>org.apache.drill.customfuncs:drill-goip</include>
       </includes>
       <scope>test</scope>
     </dependencySet>

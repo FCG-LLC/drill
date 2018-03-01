@@ -2629,6 +2629,7 @@
     </profile>
   </profiles>
   <modules>
+    <module>customfuncs</module>
     <module>tools</module>
     <module>protocol</module>
     <module>common</module>

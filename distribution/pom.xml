@@ -150,6 +150,12 @@
       <classifier>drill</classifier>
       <version>1.1</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.drill.customfuncs</groupId>
+      <artifactId>drill-bitwise</artifactId>
+      <classifier>drill</classifier>
+      <version>1.1</version>
+    </dependency>
   </dependencies>
 
   <build>

@@ -19,5 +19,6 @@
     <modules>
         <module>ipenrich</module>
         <module>geoip</module>
+        <module>bitwise</module>
     </modules>
 </project>

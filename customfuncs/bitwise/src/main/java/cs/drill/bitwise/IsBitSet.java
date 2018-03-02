@@ -6,15 +6,15 @@ import org.apache.drill.exec.expr.annotations.Output;
 import org.apache.drill.exec.expr.annotations.Param;
 import org.apache.drill.exec.expr.holders.*;
 
-public final class BitFlagSet {
+public final class IsBitSet {
     @FunctionTemplate(
-            name = "bit_flag_set",
+            name = "is_bit_set",
             scope = FunctionTemplate.FunctionScope.SIMPLE,
             nulls = FunctionTemplate.NullHandling.NULL_IF_NULL
     )
-    public static class BitAndOfBigIntsFunction implements DrillSimpleFunc {
-        @Param BigIntHolder left;
-        @Param BigIntHolder right;
+    public static class IsBitSetOfBigIntsFunction implements DrillSimpleFunc {
+        @Param BigIntHolder number;
+        @Param TinyIntHolder bitIndex;
         @Output BitHolder out;
 
         @Override
@@ -24,18 +24,18 @@ public final class BitFlagSet {
 
         @Override
         public void eval() {
-            out.value = (left.value & right.value) > 0 ? 1 : 0;
+            out.value = (number.value >>> bitIndex.value & 1) > 0 && bitIndex.value < 64 ? 1 : 0;
         }
     }
 
     @FunctionTemplate(
-            name = "bit_flag_set",
+            name = "is_bit_set",
             scope = FunctionTemplate.FunctionScope.SIMPLE,
             nulls = FunctionTemplate.NullHandling.NULL_IF_NULL
     )
-    public static class BitAndOfIntsFunction implements DrillSimpleFunc {
-        @Param IntHolder left;
-        @Param IntHolder right;
+    public static class IsBitSetOfIntsFunction implements DrillSimpleFunc {
+        @Param IntHolder number;
+        @Param TinyIntHolder bitIndex;
         @Output BitHolder out;
 
         @Override
@@ -45,18 +45,18 @@ public final class BitFlagSet {
 
         @Override
         public void eval() {
-            out.value = (left.value & right.value) > 0 ? 1 : 0;
+            out.value = (number.value >>> bitIndex.value & 1) > 0 && bitIndex.value < 32 ? 1 : 0;
         }
     }
 
     @FunctionTemplate(
-            name = "bit_flag_set",
+            name = "is_bit_set",
             scope = FunctionTemplate.FunctionScope.SIMPLE,
             nulls = FunctionTemplate.NullHandling.NULL_IF_NULL
     )
-    public static class BitAndOfSmallIntsFunction implements DrillSimpleFunc {
-        @Param SmallIntHolder left;
-        @Param SmallIntHolder right;
+    public static class IsBitSetOfSmallIntsFunction implements DrillSimpleFunc {
+        @Param SmallIntHolder number;
+        @Param TinyIntHolder bitIndex;
         @Output BitHolder out;
 
         @Override
@@ -66,18 +66,18 @@ public final class BitFlagSet {
 
         @Override
         public void eval() {
-            out.value = (left.value & right.value) > 0 ? 1 : 0;
+            out.value = (number.value >>> bitIndex.value & 1) > 0 && bitIndex.value < 16 ? 1 : 0;
         }
     }
 
     @FunctionTemplate(
-            name = "bit_flag_set",
+            name = "is_bit_set",
             scope = FunctionTemplate.FunctionScope.SIMPLE,
             nulls = FunctionTemplate.NullHandling.NULL_IF_NULL
     )
-    public static class BitAndOfTinyIntsFunction implements DrillSimpleFunc {
-        @Param TinyIntHolder left;
-        @Param TinyIntHolder right;
+    public static class IsBitSetOfTinyIntsFunction implements DrillSimpleFunc {
+        @Param TinyIntHolder number;
+        @Param TinyIntHolder bitIndex;
         @Output BitHolder out;
 
         @Override
@@ -87,9 +87,9 @@ public final class BitFlagSet {
 
         @Override
         public void eval() {
-            out.value = (left.value & right.value) > 0 ? 1 : 0;
+            out.value = (number.value >>> bitIndex.value & 1) > 0 && bitIndex.value < 8 ? 1 : 0;
         }
     }
 
-    private BitFlagSet() {}
+    private IsBitSet() {}
 }

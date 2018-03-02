@@ -29,13 +29,17 @@ public final class NumberBits {
             org.apache.drill.exec.vector.complex.writer.BaseWriter.ListWriter list = out.rootAsList();
             list.startList();
             org.apache.drill.exec.vector.complex.writer.TinyIntWriter listWriter = list.tinyInt();
-            byte i = 0;
-            while (input != 0 && i < 64) {
-                if ((input & 1) > 0) {
-                    listWriter.writeTinyInt(i);
+            if (input == 0) {
+                listWriter.writeTinyInt((byte) -1);
+            } else {
+                byte i = 0;
+                while (input != 0 && i < 64) {
+                    if ((input & 1) > 0) {
+                        listWriter.writeTinyInt(i);
+                    }
+                    input >>>= 1;
+                    i += 1;
                 }
-                input >>>= 1;
-                i += 1;
             }
             list.endList();
 
@@ -60,13 +64,17 @@ public final class NumberBits {
             org.apache.drill.exec.vector.complex.writer.BaseWriter.ListWriter list = out.rootAsList();
             list.startList();
             org.apache.drill.exec.vector.complex.writer.TinyIntWriter listWriter = list.tinyInt();
-            byte i = 0;
-            while (input != 0 && i < 32) {
-                if ((input & 1) > 0) {
-                    listWriter.writeTinyInt(i);
+            if (input == 0) {
+                listWriter.writeTinyInt((byte) -1);
+            } else {
+                byte i = 0;
+                while (input != 0 && i < 32) {
+                    if ((input & 1) > 0) {
+                        listWriter.writeTinyInt(i);
+                    }
+                    input >>>= 1;
+                    i += 1;
                 }
-                input >>>= 1;
-                i += 1;
             }
             list.endList();
         }
@@ -90,13 +98,17 @@ public final class NumberBits {
             org.apache.drill.exec.vector.complex.writer.BaseWriter.ListWriter list = out.rootAsList();
             list.startList();
             org.apache.drill.exec.vector.complex.writer.TinyIntWriter listWriter = list.tinyInt();
-            byte i = 0;
-            while (input != 0 && i < 16) {
-                if ((input & 1) > 0) {
-                    listWriter.writeTinyInt(i);
+            if (input == 0) {
+                listWriter.writeTinyInt((byte) -1);
+            } else {
+                byte i = 0;
+                while (input != 0 && i < 16) {
+                    if ((input & 1) > 0) {
+                        listWriter.writeTinyInt(i);
+                    }
+                    input >>>= 1;
+                    i += 1;
                 }
-                input >>>= 1;
-                i += 1;
             }
             list.endList();
         }
@@ -120,13 +132,17 @@ public final class NumberBits {
             org.apache.drill.exec.vector.complex.writer.BaseWriter.ListWriter list = out.rootAsList();
             list.startList();
             org.apache.drill.exec.vector.complex.writer.TinyIntWriter listWriter = list.tinyInt();
-            byte i = 0;
-            while (input != 0 && i < 8) {
-                if ((input & 1) > 0) {
-                    listWriter.writeTinyInt(i);
+            if (input == 0) {
+                listWriter.writeTinyInt((byte) -1);
+            } else {
+                byte i = 0;
+                while (input != 0 && i < 8) {
+                    if ((input & 1) > 0) {
+                        listWriter.writeTinyInt(i);
+                    }
+                    input >>>= 1;
+                    i += 1;
                 }
-                input >>>= 1;
-                i += 1;
             }
             list.endList();
         }

@@ -49,6 +49,19 @@ public class NumberBitsUnitTest {
     }
 
     @Test
+    public void zeroBigIntIsMappedCorrectly() {
+        NumberBits.NumberBitsOfBigIntFunction func = new NumberBits.NumberBitsOfBigIntFunction();
+        func.number = new BigIntHolder();
+        func.number.value = 0;
+        func.out = writer;
+
+        func.eval();
+
+        verify(tinyIntWriter).writeTinyInt((byte) -1);
+        verifyNoMoreInteractions(tinyIntWriter);
+    }
+
+    @Test
     public void intIsMappedCorrectly() {
         NumberBits.NumberBitsOfIntFunction func = new NumberBits.NumberBitsOfIntFunction();
         func.number = new IntHolder();
@@ -60,6 +73,19 @@ public class NumberBitsUnitTest {
         verify(tinyIntWriter).writeTinyInt((byte) 0);
         verify(tinyIntWriter).writeTinyInt((byte) 2);
         verify(tinyIntWriter).writeTinyInt((byte) 31);
+        verifyNoMoreInteractions(tinyIntWriter);
+    }
+
+    @Test
+    public void zeroIntIsMappedCorrectly() {
+        NumberBits.NumberBitsOfIntFunction func = new NumberBits.NumberBitsOfIntFunction();
+        func.number = new IntHolder();
+        func.number.value = 0;
+        func.out = writer;
+
+        func.eval();
+
+        verify(tinyIntWriter).writeTinyInt((byte) -1);
         verifyNoMoreInteractions(tinyIntWriter);
     }
 
@@ -79,6 +105,19 @@ public class NumberBitsUnitTest {
     }
 
     @Test
+    public void zeroSmallIntIsMappedCorrectly() {
+        NumberBits.NumberBitsOfSmallIntFunction func = new NumberBits.NumberBitsOfSmallIntFunction();
+        func.number = new SmallIntHolder();
+        func.number.value = 0;
+        func.out = writer;
+
+        func.eval();
+
+        verify(tinyIntWriter).writeTinyInt((byte) -1);
+        verifyNoMoreInteractions(tinyIntWriter);
+    }
+
+    @Test
     public void tinyIntIsMappedCorrectly() {
         NumberBits.NumberBitsOfTinyIntFunction func = new NumberBits.NumberBitsOfTinyIntFunction();
         func.number = new TinyIntHolder();
@@ -90,6 +129,19 @@ public class NumberBitsUnitTest {
         verify(tinyIntWriter).writeTinyInt((byte) 0);
         verify(tinyIntWriter).writeTinyInt((byte) 2);
         verify(tinyIntWriter).writeTinyInt((byte) 7);
+        verifyNoMoreInteractions(tinyIntWriter);
+    }
+
+    @Test
+    public void zeroTinyIntIsMappedCorrectly() {
+        NumberBits.NumberBitsOfTinyIntFunction func = new NumberBits.NumberBitsOfTinyIntFunction();
+        func.number = new TinyIntHolder();
+        func.number.value = 0;
+        func.out = writer;
+
+        func.eval();
+
+        verify(tinyIntWriter).writeTinyInt((byte) -1);
         verifyNoMoreInteractions(tinyIntWriter);
     }
 }

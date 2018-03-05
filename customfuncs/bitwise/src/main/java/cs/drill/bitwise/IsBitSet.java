@@ -14,7 +14,7 @@ public final class IsBitSet {
     )
     public static class IsBitSetOfBigIntsFunction implements DrillSimpleFunc {
         @Param BigIntHolder number;
-        @Param TinyIntHolder bitIndex;
+        @Param IntHolder bitIndex; // should be TinyIntHolder but Drill does not support it in SQL
         @Output BitHolder out;
 
         @Override
@@ -35,7 +35,7 @@ public final class IsBitSet {
     )
     public static class IsBitSetOfIntsFunction implements DrillSimpleFunc {
         @Param IntHolder number;
-        @Param TinyIntHolder bitIndex;
+        @Param IntHolder bitIndex;
         @Output BitHolder out;
 
         @Override
@@ -56,7 +56,7 @@ public final class IsBitSet {
     )
     public static class IsBitSetOfSmallIntsFunction implements DrillSimpleFunc {
         @Param SmallIntHolder number;
-        @Param TinyIntHolder bitIndex;
+        @Param IntHolder bitIndex;
         @Output BitHolder out;
 
         @Override
@@ -77,7 +77,7 @@ public final class IsBitSet {
     )
     public static class IsBitSetOfTinyIntsFunction implements DrillSimpleFunc {
         @Param TinyIntHolder number;
-        @Param TinyIntHolder bitIndex;
+        @Param IntHolder bitIndex;
         @Output BitHolder out;
 
         @Override

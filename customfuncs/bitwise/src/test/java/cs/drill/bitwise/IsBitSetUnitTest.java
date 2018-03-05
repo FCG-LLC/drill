@@ -50,12 +50,12 @@ public class IsBitSetUnitTest {
         }
     }
 
-    TinyIntHolder bitIndexHolder;
+    IntHolder bitIndexHolder;
     BitHolder outHolder;
 
     @Before
     public void setUp() {
-        bitIndexHolder = new TinyIntHolder();
+        bitIndexHolder = new IntHolder();
         outHolder = new BitHolder();
     }
 

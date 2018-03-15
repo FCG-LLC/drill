@@ -193,6 +193,7 @@
       <useProjectArtifact>false</useProjectArtifact>
       <includes>
         <include>com.google.protobuf:protobuf-java:jar:2.5</include>
+        <include>org.postgresql:postgresql:9.4.1212.jre6</include>
         <include>org.apache.drill.customfuncs:drill-ip-enrichment</include>
         <include>org.apache.drill.customfuncs:drill-goip</include>
         <include>org.apache.drill.customfuncs:drill-bitwise</include>

@@ -82,23 +82,27 @@ public class TopdiscoIpEnrichmentManager {
 
   void update() {
     try {
-      cs.drill.util.Logger.info("Reloading Topdisco app enrichment cache");
+      cs.drill.util.Logger.info("Reloading Topdisco ip enrichment cache");
       String response = fetchData();
       if (response == null) {
-        cs.drill.util.Logger.warn("Cannot reload Topdisco app enrichment - no response from Postgres received");
+        cs.drill.util.Logger.warn("Cannot reload Topdisco ip enrichment - no response from Postgres received");
         return;
       }
       if (response.hashCode() == lastResponseHash) {
-        cs.drill.util.Logger.info("No changes in Topdisco app enrichment found");
+        cs.drill.util.Logger.info("No changes in Topdisco ip enrichment found");
         return;
       }
       lastResponseHash = response.hashCode();
       JsonIpEnrichment json = parseData(response);
       if (json != null && consumer != null) {
+        int ipsLength = json.getIps() == null ? 0 : json.getIps().size();
+        int interfacesLength = json.getInterfaces() == null ? 0 : json.getInterfaces().size();
+        cs.drill.util.Logger.info("Topdisco ip enrichment updated: " +
+            ipsLength + " ips and " + interfacesLength + " interfaces");
         consumer.accept(json);
       }
     } catch (Exception exc) {
-      cs.drill.util.Logger.error("An exception occurred during Topdisco app enrichment cache reload", exc);
+      cs.drill.util.Logger.error("An exception occurred during Topdisco ip enrichment cache reload", exc);
     }
   }
 
@@ -117,7 +121,7 @@ public class TopdiscoIpEnrichmentManager {
     try {
       return objectMapper.readValue(json, JsonIpEnrichment.class);
     } catch (IOException exc) {
-      cs.drill.util.Logger.error("Cannot parse Topdisco app enrichment data from Postgres", exc);
+      cs.drill.util.Logger.error("Cannot parse Topdisco ip enrichment data from Postgres", exc);
       return null;
     }
   }

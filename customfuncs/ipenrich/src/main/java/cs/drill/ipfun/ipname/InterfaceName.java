@@ -13,12 +13,12 @@ public final class InterfaceName {
   @FunctionTemplate(
     name = "interface_name",
     scope = FunctionTemplate.FunctionScope.SIMPLE,
-    nulls = FunctionTemplate.NullHandling.NULL_IF_NULL
+    nulls = FunctionTemplate.NullHandling.INTERNAL
   )
   public static class InterfaceNameFunction implements DrillSimpleFunc {
     @Param BigIntHolder ip1;
     @Param BigIntHolder ip2;
-    @Param IntHolder interfaceNumber;
+    @Param NullableIntHolder interfaceNumber;
     @Output NullableVarCharHolder out;
     @Inject DrillBuf buffer;
 
@@ -29,6 +29,10 @@ public final class InterfaceName {
 
     @Override
     public void eval() {
+      if (interfaceNumber.isSet == 0) {
+        return;
+      }
+
       String interfaceName = cs.drill.topdisco.TopdiscoReader.getInterfaceName(ip1.value, ip2.value, interfaceNumber.value);
       cs.drill.util.OutputWriter.write(out, buffer, interfaceName);
     }

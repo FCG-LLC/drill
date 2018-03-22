@@ -107,10 +107,11 @@ public class TopdiscoIpEnrichmentManager {
   }
 
   String fetchData() throws SQLException {
-    Connection connection = DriverManager.getConnection(JDBC_URL, JDBC_USERNAME, JDBC_PASSWORD);
-    try (Statement statement = connection.createStatement()) {
-      try (ResultSet resultSet = statement.executeQuery(SQL)) {
-        return resultSet.next() ? resultSet.getString(1) : null;
+    try (Connection connection = DriverManager.getConnection(JDBC_URL, JDBC_USERNAME, JDBC_PASSWORD)) {
+      try (Statement statement = connection.createStatement()) {
+        try (ResultSet resultSet = statement.executeQuery(SQL)) {
+          return resultSet.next() ? resultSet.getString(1) : null;
+        }
       }
     }
   }

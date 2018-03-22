@@ -3,6 +3,11 @@ package cs.drill.util;
 import lombok.Value;
 import org.apache.commons.lang3.StringUtils;
 
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
 public final class IpUtil {
   public static final long WKP = 0x0064ff9b00000000L;
   private static final String IPV6_SPLIT = ":";
@@ -30,6 +35,22 @@ public final class IpUtil {
     }
 
     return new IpPair(highBits, lowBits);
+  }
+
+  public static IpPair parseIp(String ip) {
+    try {
+      InetAddress inetAddress = InetAddress.getByName(ip);
+      if (inetAddress instanceof Inet4Address) {
+        long ip2 = IpUtil.getLongIpV4Address(ip);
+        return new IpPair(IpUtil.WKP, ip2);
+      } else if (inetAddress instanceof Inet6Address) {
+        return IpUtil.getLongsIpV6Address(ip);
+      } else {
+        throw new UnknownHostException();
+      }
+    } catch (UnknownHostException exc) {
+      return null;
+    }
   }
 
   private static long[] getNumbers(String ip) {
@@ -61,6 +82,10 @@ public final class IpUtil {
   public static class IpPair {
     private long highBits;
     private long lowBits;
+
+    public boolean isIp4() {
+      return highBits == WKP;
+    }
   }
 
   private IpUtil() {}

@@ -156,6 +156,11 @@
       <classifier>drill</classifier>
       <version>1.1</version>
     </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <version>9.4.1212.jre6</version>
+    </dependency>
   </dependencies>
 
   <build>

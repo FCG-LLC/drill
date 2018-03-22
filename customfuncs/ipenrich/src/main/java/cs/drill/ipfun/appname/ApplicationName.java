@@ -10,19 +10,6 @@ import org.apache.drill.exec.expr.holders.*;
 import javax.inject.Inject;
 
 public final class ApplicationName {
-
-  public static void write(NullableVarCharHolder out, DrillBuf buffer, String value) {
-    if (value == null) {
-      return;
-    }
-    byte[] bytes = value.getBytes();
-    out.buffer = buffer;
-    out.start = 0;
-    out.end = bytes.length;
-    out.isSet = 1;
-    buffer.setBytes(0, bytes);
-  }
-
   @FunctionTemplate(
     name = "application_name",
     scope = FunctionTemplate.FunctionScope.SIMPLE,
@@ -44,7 +31,7 @@ public final class ApplicationName {
     public void eval() {
       // doesn't check for nulls since NULL_IF_NULL policy
       String applicationName = cs.drill.ipfun.appname.ApplicationNameResolver.getApplicationName(ip1.value, ip2.value, port.value);
-      cs.drill.ipfun.appname.ApplicationName.write(out, buffer, applicationName);
+      cs.drill.util.OutputWriter.write(out, buffer, applicationName);
     }
   }
 
@@ -83,7 +70,7 @@ public final class ApplicationName {
       }
 
       String applicationName = cs.drill.ipfun.appname.ApplicationNameResolver.getApplicationName(ip1.value, ip2.value, port.value);
-      cs.drill.ipfun.appname.ApplicationName.write(out, buffer, applicationName);
+      cs.drill.util.OutputWriter.write(out, buffer, applicationName);
     }
   }
 
@@ -107,7 +94,7 @@ public final class ApplicationName {
     public void eval() {
       // doesn't check for nulls since NULL_IF_NULL policy
       String applicationName = cs.drill.ipfun.appname.ApplicationNameResolver.getApplicationName(ip1.value, ip2.value);
-      cs.drill.ipfun.appname.ApplicationName.write(out, buffer, applicationName);
+      cs.drill.util.OutputWriter.write(out, buffer, applicationName);
     }
   }
 
@@ -144,7 +131,7 @@ public final class ApplicationName {
       }
 
       String applicationName = cs.drill.ipfun.appname.ApplicationNameResolver.getApplicationName(ip1.value, ip2.value);
-      cs.drill.ipfun.appname.ApplicationName.write(out, buffer, applicationName);
+      cs.drill.util.OutputWriter.write(out, buffer, applicationName);
     }
   }
 

@@ -28,9 +28,6 @@ RUN chown drill:drill /drill-scripts
 RUN apt-get install apache-drill
 RUN chmod +x /opt/drill/bin/*
 
-# installing postgresql-jdbc driver into Apache Drill
-RUN wget https://jdbc.postgresql.org/download/postgresql-9.4.1212.jre6.jar -P /opt/drill/jars/3rdparty/
-
 RUN chown drill:drill /tmp/drill
 RUN chmod 700 /tmp/drill
 

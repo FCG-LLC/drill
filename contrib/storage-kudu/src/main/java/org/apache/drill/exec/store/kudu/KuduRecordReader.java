@@ -17,10 +17,7 @@
  */
 package org.apache.drill.exec.store.kudu;
 
-import java.nio.ByteBuffer;
-import java.util.List;
-import java.util.Map;
-
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
@@ -64,7 +61,9 @@ import org.apache.kudu.client.KuduTable;
 import org.apache.kudu.client.RowResult;
 import org.apache.kudu.client.RowResultIterator;
 
-import com.google.common.collect.ImmutableList;
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
 
 public class KuduRecordReader extends AbstractRecordReader {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(KuduRecordReader.class);
@@ -181,15 +180,17 @@ public class KuduRecordReader extends AbstractRecordReader {
     }  else {
       // Cleanup target vectors
       for (ProjectedColumnInfo pci : projectedCols) {
-        pci.vv.clear();;
+        pci.vv.clear();
         pci.vv.allocateNewSafe();
       }
     }
 
     try {
         context.getStats().startWait();
-        if ((iterator != null && iterator.hasNext()) || scanner.hasMoreRows()) {
-
+        // Kudu RowResultIterator sometimes returns 0 rows even if it knows that more rows are awaiting.
+        // On the other hand Drill when using KuduRecordReader thinks that 0 rows mean end of iterating.
+        // Ergo we need to make sure that we don't return 0 here if there are more rows awaiting.
+        while (rowCount == 0 && ((iterator != null && iterator.hasNext()) || scanner.hasMoreRows())) {
           try {
             if (iterator == null || !iterator.hasNext()) {
               iterator = scanner.nextRows();

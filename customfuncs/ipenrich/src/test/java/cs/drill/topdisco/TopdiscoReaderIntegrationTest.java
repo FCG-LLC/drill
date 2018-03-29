@@ -3,7 +3,6 @@ package cs.drill.topdisco;
 import cs.drill.util.IpUtil;
 import lombok.AllArgsConstructor;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import org.junit.Before;
 import org.junit.Test;
 import static org.mockito.Mockito.doAnswer;
@@ -23,6 +22,8 @@ public class TopdiscoReaderIntegrationTest {
   static String PORT_2 = "secondTestPort";
   static int INDEX_1 = 4322;
   static int INDEX_2 = 1234;
+  static String INDEX_1_STR = Integer.toString(INDEX_1);
+  static String INDEX_2_STR = Integer.toString(INDEX_2);
 
   static {
     // from the performance reasons we want to make updates made automatically in
@@ -107,9 +108,9 @@ public class TopdiscoReaderIntegrationTest {
   }
 
   @Test
-  public void doesNotReturnNotPopulatedIp4Name() {
+  public void returnsGivenIpForNotPopulatedIp4Name() {
     populate(new JsonIp(IP4_1, NAME_1, 0));
-    assertNull(getIpName(IP4_2));
+    assertEquals(IP4_2, getIpName(IP4_2));
   }
 
   @Test
@@ -119,17 +120,17 @@ public class TopdiscoReaderIntegrationTest {
   }
 
   @Test
-  public void doesNotReturnNotPopulatedIp6Name() {
+  public void returnsGivenIpForNotPopulatedIp6Name() {
     populate(new JsonIp(IP6_1, NAME_1, 0));
-    assertNull(getIpName(IP6_2));
+    assertEquals(IP6_2, getIpName(IP6_2));
   }
 
   @Test
   public void clearsIpNamesBetweenUpdates() {
     populate(new JsonIp(IP4_1, NAME_1, 0), new JsonIp(IP6_1, NAME_1, 0));
     populate(new JsonIp(IP4_2, NAME_1, 0), new JsonIp(IP6_2, NAME_1, 0));
-    assertNull(getIpName(IP4_1));
-    assertNull(getIpName(IP6_1));
+    assertEquals(IP4_1, getIpName(IP4_1));
+    assertEquals(IP6_1, getIpName(IP6_1));
   }
 
   @Test
@@ -140,15 +141,15 @@ public class TopdiscoReaderIntegrationTest {
   }
 
   @Test
-  public void doesNotReturnNotPopulatedIp4EntryTypeZeroRouterName() {
+  public void returnsGivenIpForNotPopulatedIp4EntryTypeZeroRouterName() {
     populate(new JsonIp(IP4_1, NAME_1, 0));
-    assertNull(getRouterName(IP4_2));
+    assertEquals(IP4_2, getRouterName(IP4_2));
   }
 
   @Test
-  public void doesNotReturnNotPopulatedIp4EntryTypeOneRouterName() {
+  public void returnsGivenIpForNotPopulatedIp4EntryTypeOneRouterName() {
     populate(new JsonIp(IP4_1, NAME_1, 1));
-    assertNull(getRouterName(IP4_2));
+    assertEquals(IP4_2, getRouterName(IP4_2));
   }
 
   @Test
@@ -159,35 +160,35 @@ public class TopdiscoReaderIntegrationTest {
   }
 
   @Test
-  public void doesNotReturnNotPopulatedIp6EntryTypeZeroRouterName() {
+  public void returnsGivenIpForNotPopulatedIp6EntryTypeZeroRouterName() {
     populate(new JsonIp(IP6_1, NAME_1, 0));
-    assertNull(getRouterName(IP6_2));
+    assertEquals(IP6_2, getRouterName(IP6_2));
   }
 
   @Test
-  public void doesNotReturnNotPopulatedIp6EntryTypeOneRouterName() {
+  public void returnsGivenIpForNotPopulatedIp6EntryTypeOneRouterName() {
     populate(new JsonIp(IP6_1, NAME_1, 1));
-    assertNull(getRouterName(IP6_2));
+    assertEquals(IP6_2, getRouterName(IP6_2));
   }
 
   @Test
-  public void doesNotReturnPopulatedIp4EntryTypeThreeRouterName() {
+  public void returnsGivenIpForPopulatedIp4EntryTypeThreeRouterName() {
     populate(new JsonIp(IP4_1, NAME_1, 3));
-    assertNull(getRouterName(IP4_1));
+    assertEquals(IP4_1, getRouterName(IP4_1));
   }
 
   @Test
-  public void doesNotReturnPopulatedIp6EntryTypeThreeRouterName() {
+  public void returnsGivenIpForPopulatedIp6EntryTypeThreeRouterName() {
     populate(new JsonIp(IP6_1, NAME_1, 3));
-    assertNull(getRouterName(IP6_1));
+    assertEquals(IP6_1, getRouterName(IP6_1));
   }
 
   @Test
   public void clearsRouterNamesBetweenUpdates() {
     populate(new JsonIp(IP4_1, NAME_1, 0), new JsonIp(IP6_1, NAME_1, 0));
     populate(new JsonIp(IP4_2, NAME_1, 0), new JsonIp(IP6_2, NAME_1, 0));
-    assertNull(getRouterName(IP4_1));
-    assertNull(getRouterName(IP6_1));
+    assertEquals(IP4_1, getRouterName(IP4_1));
+    assertEquals(IP6_1, getRouterName(IP6_1));
   }
 
   @Test
@@ -198,23 +199,23 @@ public class TopdiscoReaderIntegrationTest {
   }
 
   @Test
-  public void doesNotReturnNotPopulatedInterfaceName() {
+  public void returnsGivenInterfaceNumberForNotPopulatedInterfaceName() {
     populate(new JsonInterface(PORT_2, INDEX_1, new String[] { IP4_1, IP6_1 }));
 
     // by different ip
-    assertNull(getInterfaceName(IP4_2, INDEX_1));
-    assertNull(getInterfaceName(IP6_2, INDEX_1));
+    assertEquals(INDEX_1_STR, getInterfaceName(IP4_2, INDEX_1));
+    assertEquals(INDEX_1_STR, getInterfaceName(IP6_2, INDEX_1));
 
     // by different index
-    assertNull(getInterfaceName(IP4_1, INDEX_2));
-    assertNull(getInterfaceName(IP6_1, INDEX_2));
+    assertEquals(INDEX_2_STR, getInterfaceName(IP4_1, INDEX_2));
+    assertEquals(INDEX_2_STR, getInterfaceName(IP6_1, INDEX_2));
   }
 
   @Test
   public void clearsInterfaceNamesBetweenUpdates() {
     populate(new JsonInterface(PORT_1, INDEX_1, new String[] { IP4_1, IP6_1 }));
     populate(new JsonInterface(PORT_1, INDEX_1, new String[] { IP4_2, IP6_2 }));
-    assertNull(getInterfaceName(IP4_1, INDEX_1));
-    assertNull(getInterfaceName(IP6_1, INDEX_1));
+    assertEquals(INDEX_1_STR, getInterfaceName(IP4_1, INDEX_1));
+    assertEquals(INDEX_1_STR, getInterfaceName(IP6_1, INDEX_1));
   }
 }

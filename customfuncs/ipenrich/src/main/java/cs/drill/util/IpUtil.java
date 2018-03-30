@@ -10,7 +10,8 @@ import java.net.UnknownHostException;
 
 public final class IpUtil {
   public static final long WKP = 0x0064ff9b00000000L;
-  private static final String IPV6_SPLIT = ":";
+  private static final String IPV6_SEPARATOR = ":";
+  private static final String IPV4_SEPARATOR = ".";
 
   public static long getLongIpV4Address(String address) {
     String[] parts = address.split("\\.");
@@ -55,14 +56,14 @@ public final class IpUtil {
 
   private static long[] getNumbers(String ip) {
     long[] numbers = new long[8];
-    int semicolonsCount = StringUtils.countMatches(ip, IPV6_SPLIT);
+    int semicolonsCount = StringUtils.countMatches(ip, IPV6_SEPARATOR);
     if (semicolonsCount < 7) {
-      int doubleSemicolonIndex = StringUtils.indexOf(ip, IPV6_SPLIT + IPV6_SPLIT);
+      int doubleSemicolonIndex = StringUtils.indexOf(ip, IPV6_SEPARATOR + IPV6_SEPARATOR);
       for (int i = 0; i < 7 - semicolonsCount; i++) {
-        ip = insertStringAtPosition(ip, IPV6_SPLIT, doubleSemicolonIndex);
+        ip = insertStringAtPosition(ip, IPV6_SEPARATOR, doubleSemicolonIndex);
       }
     }
-    String[] parts = ip.split(IPV6_SPLIT);
+    String[] parts = ip.split(IPV6_SEPARATOR);
     for (int i = 0; i < parts.length; i++) {
       if (parts[i].isEmpty()) {
         continue;
@@ -78,6 +79,41 @@ public final class IpUtil {
     return sb.toString();
   }
 
+  private static String ip4ToString(IpPair pair) {
+    if (pair.getHighBits() != WKP) {
+      return null;
+    }
+    long lowBits = pair.getLowBits();
+    String[] parts = new String[4];
+    for (int i = 0; i < 4; i++) {
+      parts[3 - i] = Long.toString(lowBits & 0xff);
+      lowBits = lowBits >> 8;
+    }
+    return String.join(IPV4_SEPARATOR, parts);
+  }
+
+  private static String ip6ToString(IpPair pair) {
+    // bits into string
+    String[] parts = new String[8];
+    long[] pairBits = new long[] {pair.getHighBits(), pair.getLowBits()};
+    for (int i = 0; i < 2; i++) {
+      long bits = pairBits[1 - i];
+      for (int j = 0; j < 4; j++) {
+        parts[7 - j - 4 * i] = Long.toHexString(bits & 0xffff);
+        bits = bits >> 16;
+      }
+    }
+    String ip = String.join(IPV6_SEPARATOR, parts);
+
+    // compress trailing addresses
+    ip = ip.replaceFirst("(^|:)(0+(:|$)){2,8}", "::");
+
+    // remove redundant zeros
+    ip = ip.replaceAll("(:|^)0+([0-9A-Fa-f])", "$1$2");
+
+    return ip;
+  }
+
   @Value
   public static class IpPair {
     private long highBits;
@@ -85,6 +121,11 @@ public final class IpUtil {
 
     public boolean isIp4() {
       return highBits == WKP;
+    }
+
+    public String toString() {
+      String ip = ip4ToString(this);
+      return ip == null ? ip6ToString(this) : ip;
     }
   }
 

@@ -1,9 +1,11 @@
 package cs.drill.topdisco;
 
 import cs.drill.util.IpUtil;
+import cs.drill.util.SoftIpCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.ref.SoftReference;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -15,6 +17,8 @@ public final class TopdiscoReader {
   private static final Map<Long, Map<Long, String>> IP6_ROUTER_NAMES = new HashMap<>();
   private static final Map<Long, Map<Integer, String>> IP4_INTERFACE_NAMES = new HashMap<>();
   private static final Map<Long, Map<Long, Map<Integer, String>>> IP6_INTERFACE_NAMES = new HashMap<>();
+  private static final SoftIpCache<String> IP_STRS = new SoftIpCache<>();
+  private static SoftReference<Map<Integer, String>> INTERFACE_STRS = new SoftReference<>(null);
 
   static {
     TopdiscoIpEnrichmentManager.getInstance().consumer = TopdiscoReader::populate;
@@ -102,29 +106,60 @@ public final class TopdiscoReader {
     interfacesMap.put(index, port);
   }
 
+  private static String getIpStr(long ip1, long ip2) {
+    String str = IP_STRS.get(ip1, ip2);
+    if (str == null) {
+      str = new IpUtil.IpPair(ip1, ip2).toString();
+      IP_STRS.put(ip1, ip2, str);
+    }
+    return str;
+  }
+
+  private static String getInterfaceStr(int interfaceNumber) {
+    Map<Integer, String> ref = INTERFACE_STRS.get();
+    if (ref == null) {
+      ref = new HashMap<>();
+      INTERFACE_STRS = new SoftReference<>(ref);
+    }
+    String str = ref.get(interfaceNumber);
+    if (str == null) {
+      str = Integer.toString(interfaceNumber);
+      ref.put(interfaceNumber, str);
+    }
+    return str;
+  }
+
   public static String getIpName(long ip1, long ip2) {
+    String name;
     if (ip1 == IpUtil.WKP) {
-      return IP4_NAMES.get(ip2);
+      name = IP4_NAMES.get(ip2);
     } else {
       Map<Long, String> submap = IP6_NAMES.get(ip1);
-      return submap == null ? null : submap.get(ip2);
+      name = submap == null ? null : submap.get(ip2);
     }
+    return name == null ? getIpStr(ip1, ip2) : name;
   }
 
   public static String getRouterName(long ip1, long ip2) {
+    String name;
     if (ip1 == IpUtil.WKP) {
-      return IP4_ROUTER_NAMES.get(ip2);
+      name = IP4_ROUTER_NAMES.get(ip2);
     } else {
       Map<Long, String> submap = IP6_ROUTER_NAMES.get(ip1);
-      return submap == null ? null : submap.get(ip2);
+      name = submap == null ? null : submap.get(ip2);
     }
+    return name == null ? getIpStr(ip1, ip2) : name;
   }
 
   public static String getInterfaceName(long ip1, long ip2, int interfaceNumber) {
+    String name = null;
     Map<Long, Map<Integer, String>> ip4Map = ip1 == IpUtil.WKP ? IP4_INTERFACE_NAMES : IP6_INTERFACE_NAMES.get(ip1);
-    if (ip4Map == null) return null;
-    Map<Integer, String> interfacesMap = ip4Map.get(ip2);
-    if (interfacesMap == null) return null;
-    return interfacesMap.get(interfaceNumber);
+    if (ip4Map != null) {
+      Map<Integer, String> interfacesMap = ip4Map.get(ip2);
+      if (interfacesMap != null) {
+        name = interfacesMap.get(interfaceNumber);
+      }
+    }
+    return name == null ? getInterfaceStr(interfaceNumber) : name;
   }
 }

@@ -8,6 +8,7 @@ import org.apache.drill.exec.expr.annotations.Param;
 import org.apache.drill.exec.expr.holders.BigIntHolder;
 import org.apache.drill.exec.expr.holders.NullableBigIntHolder;
 import org.apache.drill.exec.expr.holders.NullableVarCharHolder;
+import org.apache.drill.exec.expr.holders.VarCharHolder;
 
 import javax.inject.Inject;
 
@@ -20,7 +21,7 @@ public final class IpName {
   public static class IpNameFunction implements DrillSimpleFunc {
     @Param BigIntHolder ip1;
     @Param BigIntHolder ip2;
-    @Output NullableVarCharHolder out;
+    @Output VarCharHolder out;
     @Inject DrillBuf buffer;
 
     @Override

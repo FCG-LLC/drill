@@ -19,12 +19,13 @@ public class TopdiscoIpEnrichmentManager {
     "FROM (WITH ips AS\n" +
     "        (SELECT array_to_json(array_agg(t)) AS col\n" +
     "         FROM\n" +
-    "           (SELECT ine.ip,\n" +
-    "                   ine.name,\n" +
-    "                   min(ine.entry_type) AS \"entryType\"\n" +
+    "           (SELECT DISTINCT ON (ine.ip) ine.ip,\n" +
+    "                                        ine.name,\n" +
+    "                                        ine.entry_type AS \"entryType\"\n" +
     "            FROM public.ip_name_enrichment ine\n" +
-    "            GROUP BY ine.ip,\n" +
-    "                     ine.name) t) ,\n" +
+    "            ORDER BY ine.ip,\n" +
+    "                     ine.entry_type,\n" +
+    "                     ine.ts DESC) t) ,\n" +
     "           interfaces AS\n" +
     "        (SELECT array_to_json(array_agg(t)) AS col\n" +
     "         FROM\n" +

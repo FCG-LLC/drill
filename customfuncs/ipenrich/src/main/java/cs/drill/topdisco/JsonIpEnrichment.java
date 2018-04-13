@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.ToString;
 
 import java.util.List;
+import java.util.Set;
 
 @AllArgsConstructor
 @Getter
@@ -46,6 +47,6 @@ public class JsonIpEnrichment {
   public static class Interface {
     public final String port;
     public final int index;
-    public final String[] ips;
+    public final Set<String> ips;
   }
 }

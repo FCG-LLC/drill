@@ -29,12 +29,13 @@ public class TopdiscoIpEnrichmentManager {
     "           interfaces AS\n" +
     "        (SELECT array_to_json(array_agg(t)) AS col\n" +
     "         FROM\n" +
-    "           (SELECT port,\n" +
-    "                   if_index AS INDEX,\n" +
-    "                   array_to_json(array_agg(ip)) AS \"ips\"\n" +
-    "            FROM device_port\n" +
-    "            GROUP BY port,\n" +
-    "                     if_index) t)\n" +
+    "           (SELECT dp.port,\n" +
+    "                   dp.if_index AS INDEX,\n" +
+    "                   array_to_json(array_remove(array_cat(array_agg(dp.ip), array_agg(di.alias)), NULL)) AS \"ips\"\n" +
+    "            FROM device_port dp\n" +
+    "            LEFT JOIN device_ip di ON di.ip = dp.ip OR di.alias = dp.ip\n" +
+    "            GROUP BY dp.port,\n" +
+    "                     dp.if_index) t)\n" +
     "      SELECT ips.col AS \"ips\",\n" +
     "             interfaces.col AS \"interfaces\"\n" +
     "      FROM ips,\n" +

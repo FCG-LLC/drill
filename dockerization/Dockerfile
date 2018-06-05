@@ -1,5 +1,6 @@
 FROM portus.cs.int:5000/prod/cs-base-java
 ARG destEnv
+ARG debVer
 MAINTAINER team@cs.com
 
 RUN locale-gen en_US.UTF-8
@@ -25,7 +26,7 @@ RUN mkdir -p /drill-scripts
 RUN mkdir -p /tmp/drill
 
 RUN chown drill:drill /drill-scripts
-RUN apt-get install apache-drill
+RUN apt-get install apache-drill=$debVer
 RUN chmod +x /opt/drill/bin/*
 
 RUN chown drill:drill /tmp/drill

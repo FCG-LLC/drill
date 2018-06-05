@@ -1,4 +1,4 @@
-FROM portus.cs.int:5000/prod/cs-base-java
+FROM docker-registry.cs.int/prod/cs-base-java
 ARG destEnv
 ARG debVer
 MAINTAINER team@cs.com

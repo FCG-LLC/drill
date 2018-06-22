@@ -74,7 +74,7 @@ public class TopdiscoIpEnrichmentManager {
 
   void scheduleUpdates() {
     cs.drill.util.Logger.info("Scheduling TopdiscoIpEnrichment");
-    SCHEDULED_THREAD.scheduleAtFixedRate(
+    SCHEDULED_THREAD.scheduleWithFixedDelay(
       this::update,
       0,
       RELOAD_PERIOD_MINUTES,

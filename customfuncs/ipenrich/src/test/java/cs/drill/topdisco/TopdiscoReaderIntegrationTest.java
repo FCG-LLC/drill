@@ -2,6 +2,7 @@ package cs.drill.topdisco;
 
 import cs.drill.util.IpUtil;
 import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import static org.junit.Assert.assertEquals;
 import org.junit.Before;
 import org.junit.Test;
@@ -35,13 +36,16 @@ public class TopdiscoReaderIntegrationTest {
   String json;
 
   @AllArgsConstructor
+  @RequiredArgsConstructor
   static class JsonIp {
-    String ip;
-    String name;
-    int entryType;
+    final String ip;
+    final String name;
+    final int entryType;
+    String[] aliases;
 
     String toJSON() {
-      return "{\"ip\": \"" + ip + "\", \"name\": \"" + name + "\", \"entryType\": " + entryType + "}";
+      String aliasesJson = aliases == null ? "null" : "[\"" + String.join("\", \"", aliases) + "\"]";
+      return "{\"ip\": \"" + ip + "\", \"name\": \"" + name + "\", \"entryType\": " + entryType + ", \"aliases\": " + aliasesJson + "}";
     }
   }
 
@@ -108,6 +112,12 @@ public class TopdiscoReaderIntegrationTest {
   }
 
   @Test
+  public void returnsPopulatedIp4AliasName() {
+    populate(new JsonIp(IP4_1, NAME_1, 0, new String[] { IP4_2 }));
+    assertEquals(NAME_1, getIpName(IP4_2));
+  }
+
+  @Test
   public void returnsGivenIpForNotPopulatedIp4Name() {
     populate(new JsonIp(IP4_1, NAME_1, 0));
     assertEquals(IP4_2, getIpName(IP4_2));
@@ -117,6 +127,12 @@ public class TopdiscoReaderIntegrationTest {
   public void returnsPopulatedIp6Name() {
     populate(new JsonIp(IP6_1, NAME_1, 0));
     assertEquals(NAME_1, getIpName(IP6_1));
+  }
+
+  @Test
+  public void returnsPopulatedIp6AliasName() {
+    populate(new JsonIp(IP6_1, NAME_1, 0, new String[] { IP6_2 }));
+    assertEquals(NAME_1, getIpName(IP6_2));
   }
 
   @Test

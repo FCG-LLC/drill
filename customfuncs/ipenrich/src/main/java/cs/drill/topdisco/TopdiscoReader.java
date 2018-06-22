@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import java.lang.ref.SoftReference;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public final class TopdiscoReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(TopdiscoReader.class);
@@ -50,13 +51,23 @@ public final class TopdiscoReader {
   }
 
   static void populateIpEntity(JsonIpEnrichment.Ip entity) {
-    IpUtil.IpPair ip = IpUtil.parseIp(entity.getIp());
-    if (ip == null) {
-      LOGGER.warn("Unknown ip from Topdisco ip enrichment received: " + entity.getIp());
+    populateIpEntity(entity, entity.getIp());
+    Set<String> ips = entity.getAliases();
+    if (ips != null) {
+      for (String ip : ips) {
+        populateIpEntity(entity, ip);
+      }
+    }
+  }
+
+  static void populateIpEntity(JsonIpEnrichment.Ip entity, String ip) {
+    IpUtil.IpPair ipPair = IpUtil.parseIp(ip);
+    if (ipPair == null) {
+      LOGGER.warn("Unknown ip from Topdisco ip enrichment received: " + ip);
       return;
     }
-    populateIpEntityName(entity, ip);
-    populateIpEntityRouterName(entity, ip);
+    populateIpEntityName(entity, ipPair);
+    populateIpEntityRouterName(entity, ipPair);
   }
 
   static void populateIpEntityName(JsonIpEnrichment.Ip entity, IpUtil.IpPair ip) {

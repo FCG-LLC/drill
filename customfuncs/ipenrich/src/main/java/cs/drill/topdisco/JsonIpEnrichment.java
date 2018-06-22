@@ -37,6 +37,7 @@ public class JsonIpEnrichment {
      * Postgres type: smallint
      */
     private final short entryType;
+    private final Set<String> aliases;
   }
 
   @AllArgsConstructor

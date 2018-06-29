@@ -9,9 +9,9 @@
       records:
         limit: 1
         params:
-          - netflows.source_ip.name
+          - source_ip.name
     equal:
       - timestamp: PT5M
         source: netflows
         params:
-          netflows.source_ip.name: csr1.fcg.com
+          source_ip.name: csr1.fcg.com

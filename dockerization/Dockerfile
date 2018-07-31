@@ -38,6 +38,9 @@ COPY files/drill_ddl.sql /
 COPY files/test.sql /tmp/
 COPY files/docker-entrypoint.sh /
 
+COPY files/version.sh /version.sh
+RUN ln -s /version.sh /usr/bin/version
+
 USER drill
 CMD ["/docker-entrypoint.sh"]
 

@@ -32,7 +32,7 @@ RUN chmod +x /opt/drill/bin/*
 RUN chown drill:drill /tmp/drill
 RUN chmod 700 /tmp/drill
 
-RUN paxctl -c /usr/lib/jvm/java-8-oracle/jre/bin/java && paxctl -m /usr/lib/jvm/java-8-oracle/jre/bin/java 
+RUN paxctl -c /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java && paxctl -m /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
 
 COPY files/drill_ddl.sql /
 COPY files/test.sql /tmp/

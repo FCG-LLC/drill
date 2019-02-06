@@ -36,10 +36,12 @@ RUN paxctl -c /usr/lib/jvm/java-8-oracle/jre/bin/java && paxctl -m /usr/lib/jvm/
 
 COPY files/drill_ddl.sql /
 COPY files/test.sql /tmp/
+COPY files/post-start.sh /
 COPY files/docker-entrypoint.sh /
 
 COPY files/version.sh /version.sh
 RUN ln -s /version.sh /usr/bin/version
+RUN ln -s /post-start.sh /usr/bin/post-start
 
 USER drill
 CMD ["/docker-entrypoint.sh"]

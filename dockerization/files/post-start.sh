@@ -1,6 +1,11 @@
 #!/bin/bash
 
-readonly DRILL_CONFIG_URL=$(hostname):8047
+readonly HOSTNAME=$(hostname)
+readonly PORT=8047
+
+echo "INFO: waiting for Drill Java initialization."
+echo "INFO: Checking if Drill is up ..."
+wait-for "$HOSTNAME" "$PORT" || exit 1
 
 chown drill:drill /tmp/drill/ -R
 

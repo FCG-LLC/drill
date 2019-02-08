@@ -38,10 +38,12 @@ COPY files/drill_ddl.sql /
 COPY files/test.sql /tmp/
 COPY files/post-start.sh /
 COPY files/docker-entrypoint.sh /
+COPY files/wait-for.sh /
 
 COPY files/version.sh /version.sh
 RUN ln -s /version.sh /usr/bin/version
 RUN ln -s /post-start.sh /usr/bin/post-start
+RUN ln -s /wait-for.sh /usr/bin/wait-for
 
 USER drill
 CMD ["/docker-entrypoint.sh"]

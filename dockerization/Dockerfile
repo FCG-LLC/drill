@@ -32,14 +32,18 @@ RUN chmod +x /opt/drill/bin/*
 RUN chown drill:drill /tmp/drill
 RUN chmod 700 /tmp/drill
 
-RUN paxctl -c /usr/lib/jvm/java-8-oracle/jre/bin/java && paxctl -m /usr/lib/jvm/java-8-oracle/jre/bin/java 
+RUN paxctl -c /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java && paxctl -m /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
 
 COPY files/drill_ddl.sql /
 COPY files/test.sql /tmp/
+COPY files/post-start.sh /
 COPY files/docker-entrypoint.sh /
+COPY files/wait-for.sh /
 
 COPY files/version.sh /version.sh
 RUN ln -s /version.sh /usr/bin/version
+RUN ln -s /post-start.sh /usr/bin/post-start
+RUN ln -s /wait-for.sh /usr/bin/wait-for
 
 USER drill
 CMD ["/docker-entrypoint.sh"]
